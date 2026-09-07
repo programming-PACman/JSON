@@ -1,0 +1,11 @@
+body { font-family: system-ui, sans-serif; margin: 0; }
+.app { max-width: 1000px; margin: 0 auto; padding: 24px; }
+.app-columns { display: grid; grid-template-columns: 1fr 1.2fr; gap: 32px; }
+textarea { width: 100%; font-family: monospace; box-sizing: border-box; }
+.field { margin-bottom: 14px; }
+.field label { display: block; margin-bottom: 4px; }
+.required { color: red; }
+.field-error { color: red; font-size: 12px; }
+.error-list { background: #fdecec; padding: 10px; margin-top: 10px; }
+.output-json { background: #222; color: #dfd; padding: 12px; }
+button { padding: 6px 14px; margin-top: 8px; }

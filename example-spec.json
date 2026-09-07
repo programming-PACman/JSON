@@ -1,0 +1,12 @@
+{
+  "title": "Пример формы",
+  "elements": [
+    { "name": "username", "label": "Имя пользователя", "type": "text", "required": true },
+    { "name": "age", "label": "Возраст", "type": "number" },
+    { "name": "role", "label": "Роль", "type": "select", "options": [
+      { "value": "admin", "label": "Администратор" },
+      { "value": "user", "label": "Пользователь" }
+    ]},
+    { "name": "subscribe", "label": "Подписаться на рассылку", "type": "checkbox" }
+  ]
+}
