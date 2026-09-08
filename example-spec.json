@@ -7,6 +7,13 @@
       { "value": "admin", "label": "Администратор" },
       { "value": "user", "label": "Пользователь" }
     ]},
-    { "name": "subscribe", "label": "Подписаться на рассылку", "type": "checkbox" }
+    { "name": "subscribe", "label": "Подписаться на рассылку", "type": "checkbox" },
+    { "name": "bio", "label": "О себе", "type": "textarea" },
+    { "name": "email", "label": "E-mail", "type": "email", "required": true },
+    { "name": "birthday", "label": "Дата рождения", "type": "date" },
+    { "name": "gender", "label": "Пол", "type": "radio", "options": [
+      { "value": "m", "label": "Мужской" },
+      { "value": "f", "label": "Женский" }
+    ]}
   ]
 }

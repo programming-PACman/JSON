@@ -13,10 +13,21 @@ export default function App() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [collected, setCollected] = useState(null);
 
-  const handleLoad = () => {
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setText(reader.result);
+      handleLoadFromText(reader.result);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleLoadFromText = (raw) => {
     let parsed;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(raw);
     } catch (e) {
       setSpecErrors([{ path: '$', message: `Некорректный JSON: ${e.message}` }]);
       setSpec(null);
@@ -35,6 +46,8 @@ export default function App() {
       setSpec(null);
     }
   };
+
+  const handleLoad = () => handleLoadFromText(text);
 
   const handleFieldChange = (name, value) => {
     const element = spec.elements.find((el) => el.name === name);
@@ -55,7 +68,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <h1>JSON GUI Builder</h1>
+      <h1>JSON GUI Builder (начальная версия)</h1>
       <div className="app-columns">
         <section>
           <label htmlFor="spec-text">JSON-спецификация</label>
@@ -67,6 +80,10 @@ export default function App() {
             placeholder='{"title": "...", "elements": [...]}'
           />
           <button type="button" onClick={handleLoad}>Загрузить спецификацию</button>
+          <label className="file-button">
+            Загрузить файл .json
+            <input type="file" accept=".json" onChange={handleFile} hidden />
+          </label>
 
           {specErrors.length > 0 && (
             <div className="error-list">

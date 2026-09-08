@@ -5,7 +5,7 @@
 // TODO: валидация min/max/options, bind (data binding), array/matrix/list,
 // уникальность имён, циклические зависимости — следующие этапы.
 
-const SUPPORTED_TYPES = ['text', 'number', 'select', 'checkbox'];
+const SUPPORTED_TYPES = ['text', 'textarea', 'number', 'email', 'date', 'select', 'radio', 'checkbox'];
 
 export function validateSpec(spec) {
   const errors = [];
@@ -37,6 +37,9 @@ export function validateSpec(spec) {
     }
     if (el.type === 'select' && (!Array.isArray(el.options) || el.options.length === 0)) {
       errors.push({ path: `${path}.options`, message: 'Для типа select нужен непустой options' });
+    }
+    if (el.type === 'radio' && (!Array.isArray(el.options) || el.options.length === 0)) {
+      errors.push({ path: `${path}.options`, message: 'Для типа radio нужен непустой options' });
     }
   });
 
