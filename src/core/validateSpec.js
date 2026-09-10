@@ -2,10 +2,9 @@
 // Проверяет только самое необходимое: наличие title и elements,
 // у каждого элемента — name/label/type, и что type — один из
 // поддерживаемых на этом этапе типов.
-// TODO: валидация min/max/options, bind (data binding), array/matrix/list,
-// уникальность имён, циклические зависимости — следующие этапы.
+// TODO: bind (data binding), array/matrix/list, уникальность имён — следующие этапы.
 
-const SUPPORTED_TYPES = ['text', 'number', 'select', 'checkbox'];
+const SUPPORTED_TYPES = ['text', 'textarea', 'number', 'email', 'date', 'select', 'radio', 'checkbox'];
 
 export function validateSpec(spec) {
   const errors = [];
@@ -35,8 +34,8 @@ export function validateSpec(spec) {
     if (!SUPPORTED_TYPES.includes(el.type)) {
       errors.push({ path: `${path}.type`, message: `Тип "${el.type}" пока не поддерживается` });
     }
-    if (el.type === 'select' && (!Array.isArray(el.options) || el.options.length === 0)) {
-      errors.push({ path: `${path}.options`, message: 'Для типа select нужен непустой options' });
+    if ((el.type === 'select' || el.type === 'radio') && (!Array.isArray(el.options) || el.options.length === 0)) {
+      errors.push({ path: `${path}.options`, message: `Для типа ${el.type} нужен непустой options` });
     }
   });
 

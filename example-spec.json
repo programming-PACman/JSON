@@ -1,12 +1,27 @@
 {
   "title": "Пример формы",
+  "titleKey": "form_title",
   "elements": [
-    { "name": "username", "label": "Имя пользователя", "type": "text", "required": true },
-    { "name": "age", "label": "Возраст", "type": "number" },
-    { "name": "role", "label": "Роль", "type": "select", "options": [
-      { "value": "admin", "label": "Администратор" },
-      { "value": "user", "label": "Пользователь" }
-    ]},
-    { "name": "subscribe", "label": "Подписаться на рассылку", "type": "checkbox" }
-  ]
+    { "name": "username", "label": "Имя пользователя", "labelKey": "username_label", "type": "text", "required": true },
+    { "name": "age", "label": "Возраст", "labelKey": "age_label", "type": "number", "min": 0, "max": 120 },
+    {
+      "name": "role", "label": "Роль", "labelKey": "role_label", "type": "select",
+      "options": [
+        { "value": "admin", "label": "Администратор", "labelKey": "role_admin" },
+        { "value": "user", "label": "Пользователь", "labelKey": "role_user" }
+      ]
+    },
+    { "name": "subscribe", "label": "Подписаться на рассылку", "labelKey": "subscribe_label", "type": "checkbox" }
+  ],
+  "translations": {
+    "en": {
+      "form_title": "Example Form",
+      "username_label": "Username",
+      "age_label": "Age",
+      "role_label": "Role",
+      "role_admin": "Administrator",
+      "role_user": "User",
+      "subscribe_label": "Subscribe to newsletter"
+    }
+  }
 }
