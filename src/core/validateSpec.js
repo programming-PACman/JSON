@@ -37,6 +37,9 @@ export function validateSpec(spec) {
     if ((el.type === 'select' || el.type === 'radio') && (!Array.isArray(el.options) || el.options.length === 0)) {
       errors.push({ path: `${path}.options`, message: `Для типа ${el.type} нужен непустой options` });
     }
+    if (el.type === 'radio' && (!Array.isArray(el.options) || el.options.length === 0)) {
+      errors.push({ path: `${path}.options`, message: 'Для типа radio нужен непустой options' });
+    }
   });
 
   return errors;
