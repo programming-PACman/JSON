@@ -3,13 +3,31 @@ import FormRenderer from './components/FormRenderer.jsx';
 import { validateSpec } from './core/validateSpec.js';
 import { validateValue } from './core/validateValue.js';
 import { UI_STRINGS, resolveText } from './core/i18n.js';
+import { buildDependencyGraph, propagateChange } from './core/bindingEngine.js';
+
+function computeInitialState(elements, graph) {
+  let values = {};
+  elements.forEach((el) => { if (el.default !== undefined) values[el.name] = el.default; });
+  let dynamicOptions = {}, visibility = {};
+  Object.keys(graph.dependents).forEach((sourceName) => {
+    if (values[sourceName] === undefined) return;
+    const r = propagateChange(sourceName, graph, values);
+    values = r.values;
+    dynamicOptions = { ...dynamicOptions, ...r.dynamicOptions };
+    visibility = { ...visibility, ...r.visibility };
+  });
+  return { values, dynamicOptions, visibility };
+}
 
 export default function App() {
   const [locale, setLocale] = useState('ru');
   const [text, setText] = useState('');
   const [spec, setSpec] = useState(null);
+  const [graph, setGraph] = useState(null);
   const [specErrors, setSpecErrors] = useState([]);
   const [values, setValues] = useState({});
+  const [dynamicOptions, setDynamicOptions] = useState({});
+  const [visibility, setVisibility] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
   const [collected, setCollected] = useState(null);
 
@@ -30,8 +48,13 @@ export default function App() {
     setCollected(null);
 
     if (errors.length === 0) {
+      const newGraph = buildDependencyGraph(parsed.elements);
+      const initial = computeInitialState(parsed.elements, newGraph);
       setSpec(parsed);
-      setValues({});
+      setGraph(newGraph);
+      setValues(initial.values);
+      setDynamicOptions(initial.dynamicOptions);
+      setVisibility(initial.visibility);
       setFieldErrors({});
     } else {
       setSpec(null);
@@ -57,12 +80,18 @@ export default function App() {
     const element = spec.elements.find((el) => el.name === name);
     const message = validateValue(element, value, locale, resolvedLabel(element));
     setFieldErrors((prev) => ({ ...prev, [name]: message }));
-    setValues((prev) => ({ ...prev, [name]: value }));
+
+    const updated = { ...values, [name]: value };
+    const r = propagateChange(name, graph, updated);
+    setValues(r.values);
+    setDynamicOptions((prev) => ({ ...prev, ...r.dynamicOptions }));
+    setVisibility((prev) => ({ ...prev, ...r.visibility }));
   };
 
   const handleCollect = () => {
     const errors = {};
     spec.elements.forEach((el) => {
+      if (visibility[el.name] === false) return;
       const message = validateValue(el, values[el.name], locale, resolvedLabel(el));
       if (message) errors[el.name] = message;
     });
@@ -109,7 +138,7 @@ export default function App() {
           {spec && (
             <>
               <h2>{resolveText(spec, 'title', locale, spec.translations) ?? spec.title}</h2>
-              <FormRenderer spec={spec} values={values} errors={fieldErrors} locale={locale} onFieldChange={handleFieldChange} />
+              <FormRenderer spec={spec} values={values} errors={fieldErrors} locale={locale} dynamicOptions={dynamicOptions} visibility={visibility} onFieldChange={handleFieldChange} />
               <button type="button" onClick={handleCollect}>{t.collectButton}</button>
               {collected && <pre className="output-json">{JSON.stringify(collected, null, 2)}</pre>}
             </>

@@ -13,3 +13,6 @@ textarea { width: 100%; font-family: monospace; box-sizing: border-box; }
 button { padding: 6px 14px; margin-top: 8px; margin-right: 6px; }
 .file-button { display: inline-block; padding: 6px 14px; margin-top: 8px; border: 1px solid #999; cursor: pointer; }
 .radio-option { display: block; font-weight: normal; }
+.array-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.matrix-table { border-collapse: collapse; margin-bottom: 8px; }
+.matrix-table th, .matrix-table td { border: 1px solid #ccc; padding: 6px 8px; }

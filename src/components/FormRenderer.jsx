@@ -1,26 +1,31 @@
 import { resolveText, UI_STRINGS } from '../core/i18n.js';
+import ArrayField from './ArrayField.jsx';
+import MatrixField from './MatrixField.jsx';
 
-// Рендерит форму по спецификации. Пока поддерживает базовые типы,
-// без data binding и без array/matrix/list — следующие этапы.
-export default function FormRenderer({ spec, values, errors, locale, onFieldChange }) {
+// Рендерит форму по спецификации.
+export default function FormRenderer({ spec, values, errors, locale, dynamicOptions, visibility, onFieldChange }) {
   return (
     <div className="form-renderer">
-      {spec.elements.map((element) => (
-        <Field
-          key={element.name}
-          element={element}
-          value={values[element.name]}
-          error={errors[element.name]}
-          locale={locale}
-          translations={spec.translations}
-          onChange={(v) => onFieldChange(element.name, v)}
-        />
-      ))}
+      {spec.elements.map((element) => {
+        if (visibility?.[element.name] === false) return null;
+        return (
+          <Field
+            key={element.name}
+            element={element}
+            value={values[element.name]}
+            error={errors[element.name]}
+            locale={locale}
+            translations={spec.translations}
+            options={dynamicOptions?.[element.name] ?? element.options}
+            onChange={(v) => onFieldChange(element.name, v)}
+          />
+        );
+      })}
     </div>
   );
 }
 
-function Field({ element, value, error, locale, translations, onChange }) {
+function Field({ element, value, error, locale, translations, options, onChange }) {
   const t = UI_STRINGS[locale] || UI_STRINGS.ru;
   const label = resolveText(element, 'label', locale, translations) ?? element.label;
 
@@ -29,11 +34,31 @@ function Field({ element, value, error, locale, translations, onChange }) {
     label: resolveText(opt, 'label', locale, translations) ?? opt.label,
   });
 
+  if (element.type === 'array') {
+    return (
+      <div className="field">
+        <span>{label}{element.required && <span className="required">*</span>}</span>
+        <ArrayField element={element} value={value} onChange={onChange} />
+        {error && <p className="field-error">{error}</p>}
+      </div>
+    );
+  }
+
+  if (element.type === 'matrix') {
+    return (
+      <div className="field">
+        <span>{label}{element.required && <span className="required">*</span>}</span>
+        <MatrixField element={element} value={value} onChange={onChange} locale={locale} translations={translations} />
+        {error && <p className="field-error">{error}</p>}
+      </div>
+    );
+  }
+
   if (element.type === 'radio') {
     return (
       <div className="field">
         <span>{label}{element.required && <span className="required">*</span>}</span>
-        {element.options.map(resolveOption).map((opt) => (
+        {(options || []).map(resolveOption).map((opt) => (
           <label key={opt.value} className="radio-option">
             <input
               type="radio"
@@ -66,13 +91,13 @@ function Field({ element, value, error, locale, translations, onChange }) {
     input = (
       <select id={element.name} value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
         <option value="" disabled>{t.selectPlaceholder}</option>
-        {element.options.map(resolveOption).map((opt) => (
+        {(options || []).map(resolveOption).map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
     );
   } else if (element.type === 'textarea') {
-    input = <textarea id={element.name} rows={4} value={value ?? ''} onChange={(e) => onChange(e.target.value)} />;
+    input = <textarea id={element.name} rows={4} value={value ?? ''} onChange={(e) => onChange(e.target.value)} disabled={element.disabled} />;
   } else {
     const inputType = element.type === 'number' ? 'number' : element.type === 'email' ? 'email' : element.type === 'date' ? 'date' : 'text';
     input = (
@@ -80,6 +105,7 @@ function Field({ element, value, error, locale, translations, onChange }) {
         id={element.name}
         type={inputType}
         value={value ?? ''}
+        disabled={element.disabled}
         onChange={(e) => onChange(element.type === 'number' ? Number(e.target.value) : e.target.value)}
       />
     );
