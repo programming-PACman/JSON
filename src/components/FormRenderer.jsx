@@ -1,6 +1,7 @@
 import { resolveText, UI_STRINGS } from '../core/i18n.js';
 import ArrayField from './ArrayField.jsx';
 import MatrixField from './MatrixField.jsx';
+import ListField from './ListField.jsx';
 
 // Рендерит форму по спецификации.
 export default function FormRenderer({ spec, values, errors, locale, dynamicOptions, visibility, onFieldChange }) {
@@ -38,7 +39,16 @@ function Field({ element, value, error, locale, translations, options, onChange 
     return (
       <div className="field">
         <span>{label}{element.required && <span className="required">*</span>}</span>
-        <ArrayField element={element} value={value} onChange={onChange} />
+        <ArrayField element={element} value={value} error={error} onChange={onChange} />
+      </div>
+    );
+  }
+
+  if (element.type === 'list') {
+    return (
+      <div className="field">
+        <span>{label}{element.required && <span className="required">*</span>}</span>
+        <ListField element={element} value={value} onChange={onChange} locale={locale} translations={translations} />
         {error && <p className="field-error">{error}</p>}
       </div>
     );
@@ -48,8 +58,7 @@ function Field({ element, value, error, locale, translations, options, onChange 
     return (
       <div className="field">
         <span>{label}{element.required && <span className="required">*</span>}</span>
-        <MatrixField element={element} value={value} onChange={onChange} locale={locale} translations={translations} />
-        {error && <p className="field-error">{error}</p>}
+        <MatrixField element={element} value={value} error={error} onChange={onChange} locale={locale} translations={translations} />
       </div>
     );
   }

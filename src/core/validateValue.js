@@ -28,3 +28,28 @@ export function validateValue(element, value, locale = 'ru', label = element.lab
 
   return null;
 }
+
+// Валидирует КАЖДЫЙ элемент array по правилам itemType.
+// Возвращает массив вида ["ошибка" | null, ...], параллельный items.
+export function validateArrayItems(element, items, locale) {
+  if (!Array.isArray(items)) return [];
+  const itemElement = { label: element.label, type: element.itemType };
+  return items.map((item) => validateValue(itemElement, item, locale));
+}
+
+// Валидирует КАЖДУЮ ячейку КАЖДОЙ строки matrix по правилам её столбца.
+// Возвращает массив вида [{ colName: "ошибка" }, ...], параллельный rows.
+export function validateMatrixRows(element, rows, locale) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((row) => {
+    const rowErrors = {};
+    element.columns.forEach((col) => {
+      const message = validateValue(col, row?.[col.name], locale);
+      if (message) rowErrors[col.name] = message;
+    });
+    return rowErrors;
+  });
+}
+
+export function hasAnyArrayError(errs) { return errs.some((m) => m !== null); }
+export function hasAnyMatrixError(errs) { return errs.some((row) => Object.keys(row).length > 0); }

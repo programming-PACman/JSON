@@ -1,7 +1,8 @@
 import { resolveText } from '../core/i18n.js';
 
-// Таблица со столбцами заданных типов, строки добавляются/удаляются.
-export default function MatrixField({ element, value, onChange, locale, translations }) {
+// Таблица со столбцами заданных типов, строки добавляются/удаляются/переставляются.
+// error — массив [{ colName: "ошибка" }, ...], параллельный rows (validateMatrixRows).
+export default function MatrixField({ element, value, error, onChange, locale, translations }) {
   const rows = Array.isArray(value) ? value : [];
 
   const emptyRow = () => Object.fromEntries(element.columns.map((c) => [c.name, '']));
@@ -11,6 +12,13 @@ export default function MatrixField({ element, value, onChange, locale, translat
   };
   const addRow = () => onChange([...rows, emptyRow()]);
   const removeRow = (i) => onChange(rows.filter((_, idx) => idx !== i));
+  const moveRow = (i, dir) => {
+    const target = i + dir;
+    if (target < 0 || target >= rows.length) return;
+    const next = [...rows];
+    [next[i], next[target]] = [next[target], next[i]];
+    onChange(next);
+  };
 
   return (
     <div className="matrix-wrap">
@@ -33,9 +41,14 @@ export default function MatrixField({ element, value, onChange, locale, translat
                     value={row[col.name] ?? ''}
                     onChange={(e) => updateCell(rowIndex, col.name, col.type === 'number' ? Number(e.target.value) : e.target.value)}
                   />
+                  {error?.[rowIndex]?.[col.name] && <p className="field-error">{error[rowIndex][col.name]}</p>}
                 </td>
               ))}
-              <td><button type="button" onClick={() => removeRow(rowIndex)}>✕</button></td>
+              <td className="matrix-row-actions">
+                <button type="button" onClick={() => moveRow(rowIndex, -1)} disabled={rowIndex === 0}>↑</button>
+                <button type="button" onClick={() => moveRow(rowIndex, 1)} disabled={rowIndex === rows.length - 1}>↓</button>
+                <button type="button" onClick={() => removeRow(rowIndex)}>✕</button>
+              </td>
             </tr>
           ))}
         </tbody>

@@ -4,7 +4,7 @@
   "elements": [
     { "name": "username", "label": "Имя пользователя", "labelKey": "username_label", "type": "text", "required": true },
     { "name": "hasComment", "label": "Добавить комментарий?", "labelKey": "has_comment_label", "type": "checkbox", "default": false },
-    { "name": "comment", "label": "Комментарий", "labelKey": "comment_label", "type": "textarea", "bind": { "visibleWhen": "hasComment == true" } },
+    { "name": "comment", "label": "Комментарий", "labelKey": "comment_label", "type": "textarea", "default": "Комментарий по умолчанию", "bind": { "visibleWhen": "hasComment == true" } },
     { "name": "width", "label": "Ширина", "labelKey": "width_label", "type": "number", "min": 0, "default": 5 },
     { "name": "height", "label": "Высота", "labelKey": "height_label", "type": "number", "min": 0, "default": 3 },
     { "name": "area", "label": "Площадь (вычисляется)", "labelKey": "area_label", "type": "number", "disabled": true, "bind": { "computed": "width * height" } },
@@ -13,7 +13,15 @@
       "name": "servers", "label": "Серверы", "labelKey": "servers_label", "type": "matrix",
       "columns": [
         { "name": "ip", "label": "IP-адрес", "labelKey": "col_ip", "type": "text" },
-        { "name": "cores", "label": "Ядра", "labelKey": "col_cores", "type": "number" }
+        { "name": "cores", "label": "Ядра", "labelKey": "col_cores", "type": "number", "min": 1 }
+      ]
+    },
+    {
+      "name": "contacts", "label": "Контакты", "labelKey": "contacts_label", "type": "list",
+      "rowLabel": "Контакт {index}",
+      "template": [
+        { "name": "fullName", "label": "ФИО", "type": "text" },
+        { "name": "email", "label": "E-mail", "type": "email" }
       ]
     }
   ],

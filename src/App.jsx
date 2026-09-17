@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import FormRenderer from './components/FormRenderer.jsx';
 import { validateSpec } from './core/validateSpec.js';
-import { validateValue } from './core/validateValue.js';
+import { validateValue, validateArrayItems, validateMatrixRows, hasAnyArrayError, hasAnyMatrixError } from './core/validateValue.js';
 import { UI_STRINGS, resolveText } from './core/i18n.js';
 import { buildDependencyGraph, propagateChange } from './core/bindingEngine.js';
 
@@ -78,7 +78,10 @@ export default function App() {
 
   const handleFieldChange = (name, value) => {
     const element = spec.elements.find((el) => el.name === name);
-    const message = validateValue(element, value, locale, resolvedLabel(element));
+    let message;
+    if (element.type === 'array') message = validateArrayItems(element, value, locale);
+    else if (element.type === 'matrix') message = validateMatrixRows(element, value, locale);
+    else message = validateValue(element, value, locale, resolvedLabel(element));
     setFieldErrors((prev) => ({ ...prev, [name]: message }));
 
     const updated = { ...values, [name]: value };
@@ -92,8 +95,16 @@ export default function App() {
     const errors = {};
     spec.elements.forEach((el) => {
       if (visibility[el.name] === false) return;
-      const message = validateValue(el, values[el.name], locale, resolvedLabel(el));
-      if (message) errors[el.name] = message;
+      if (el.type === 'array') {
+        const itemErrors = validateArrayItems(el, values[el.name] || [], locale);
+        if (hasAnyArrayError(itemErrors)) errors[el.name] = itemErrors;
+      } else if (el.type === 'matrix') {
+        const rowErrors = validateMatrixRows(el, values[el.name] || [], locale);
+        if (hasAnyMatrixError(rowErrors)) errors[el.name] = rowErrors;
+      } else {
+        const message = validateValue(el, values[el.name], locale, resolvedLabel(el));
+        if (message) errors[el.name] = message;
+      }
     });
     setFieldErrors(errors);
     setCollected(Object.keys(errors).length === 0 ? values : null);

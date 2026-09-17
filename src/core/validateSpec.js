@@ -6,7 +6,7 @@
 
 import { extractIdentifiers } from './expression.js';
 
-const SUPPORTED_TYPES = ['text', 'textarea', 'number', 'email', 'date', 'select', 'radio', 'checkbox', 'array', 'matrix'];
+const SUPPORTED_TYPES = ['text', 'textarea', 'number', 'email', 'date', 'select', 'radio', 'checkbox', 'array', 'matrix', 'list'];
 const ARRAY_ITEM_TYPES = ['text', 'number', 'email', 'date'];
 
 export function validateSpec(spec) {
@@ -45,6 +45,9 @@ export function validateSpec(spec) {
     }
     if (el.type === 'matrix' && (!Array.isArray(el.columns) || el.columns.length === 0)) {
       errors.push({ path: `${path}.columns`, message: 'Для типа matrix нужен непустой columns' });
+    }
+    if (el.type === 'list' && (!Array.isArray(el.template) || el.template.length === 0)) {
+      errors.push({ path: `${path}.template`, message: 'Для типа list нужен непустой template' });
     }
   });
 
