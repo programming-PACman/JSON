@@ -8,7 +8,7 @@
     { "name": "width", "label": "Ширина", "labelKey": "width_label", "type": "number", "min": 0, "default": 5 },
     { "name": "height", "label": "Высота", "labelKey": "height_label", "type": "number", "min": 0, "default": 3 },
     { "name": "area", "label": "Площадь (вычисляется)", "labelKey": "area_label", "type": "number", "disabled": true, "bind": { "computed": "width * height" } },
-    { "name": "tags", "label": "Теги", "labelKey": "tags_label", "type": "array", "itemType": "text" },
+    { "name": "tags", "label": "Теги", "labelKey": "tags_label", "type": "array", "itemType": "text", "maxItems": 3 },
     {
       "name": "servers", "label": "Серверы", "labelKey": "servers_label", "type": "matrix",
       "columns": [

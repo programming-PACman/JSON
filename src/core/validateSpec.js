@@ -49,6 +49,17 @@ export function validateSpec(spec) {
     if (el.type === 'list' && (!Array.isArray(el.template) || el.template.length === 0)) {
       errors.push({ path: `${path}.template`, message: 'Для типа list нужен непустой template' });
     }
+    if (['array', 'matrix', 'list'].includes(el.type)) {
+      if (el.minItems !== undefined && (typeof el.minItems !== 'number' || el.minItems < 0)) {
+        errors.push({ path: `${path}.minItems`, message: 'minItems должно быть неотрицательным числом' });
+      }
+      if (el.maxItems !== undefined && (typeof el.maxItems !== 'number' || el.maxItems < 0)) {
+        errors.push({ path: `${path}.maxItems`, message: 'maxItems должно быть неотрицательным числом' });
+      }
+      if (typeof el.minItems === 'number' && typeof el.maxItems === 'number' && el.minItems > el.maxItems) {
+        errors.push({ path, message: 'minItems не может быть больше maxItems' });
+      }
+    }
   });
 
   errors.push(...validateBindings(spec.elements));

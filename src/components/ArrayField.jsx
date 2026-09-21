@@ -3,6 +3,8 @@
 export default function ArrayField({ element, value, error, onChange }) {
   const items = Array.isArray(value) ? value : [];
   const inputType = element.itemType === 'number' ? 'number' : element.itemType === 'email' ? 'email' : element.itemType === 'date' ? 'date' : 'text';
+  const canAdd = element.maxItems === undefined || items.length < element.maxItems;
+  const canRemove = items.length > (element.minItems ?? 0);
 
   const update = (i, v) => {
     const next = [...items];
@@ -33,10 +35,10 @@ export default function ArrayField({ element, value, error, onChange }) {
           </div>
           <button type="button" onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
           <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1}>↓</button>
-          <button type="button" onClick={() => remove(i)}>✕</button>
+          <button type="button" onClick={() => remove(i)} disabled={!canRemove}>✕</button>
         </div>
       ))}
-      <button type="button" onClick={add}>+ Добавить</button>
+      <button type="button" onClick={add} disabled={!canAdd}>+ Добавить</button>
     </div>
   );
 }

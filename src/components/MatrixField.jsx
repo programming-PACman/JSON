@@ -4,6 +4,8 @@ import { resolveText } from '../core/i18n.js';
 // error — массив [{ colName: "ошибка" }, ...], параллельный rows (validateMatrixRows).
 export default function MatrixField({ element, value, error, onChange, locale, translations }) {
   const rows = Array.isArray(value) ? value : [];
+  const canAdd = element.maxItems === undefined || rows.length < element.maxItems;
+  const canRemove = rows.length > (element.minItems ?? 0);
 
   const emptyRow = () => Object.fromEntries(element.columns.map((c) => [c.name, '']));
   const updateCell = (rowIndex, colName, v) => {
@@ -47,13 +49,13 @@ export default function MatrixField({ element, value, error, onChange, locale, t
               <td className="matrix-row-actions">
                 <button type="button" onClick={() => moveRow(rowIndex, -1)} disabled={rowIndex === 0}>↑</button>
                 <button type="button" onClick={() => moveRow(rowIndex, 1)} disabled={rowIndex === rows.length - 1}>↓</button>
-                <button type="button" onClick={() => removeRow(rowIndex)}>✕</button>
+                <button type="button" onClick={() => removeRow(rowIndex)} disabled={!canRemove}>✕</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button type="button" onClick={addRow}>+ Добавить строку</button>
+      <button type="button" onClick={addRow} disabled={!canAdd}>+ Добавить строку</button>
     </div>
   );
 }

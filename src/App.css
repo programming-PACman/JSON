@@ -9,6 +9,7 @@ textarea { width: 100%; font-family: monospace; box-sizing: border-box; }
 .required { color: red; }
 .field-error { color: red; font-size: 12px; }
 .error-list { background: #fdecec; padding: 10px; margin-top: 10px; }
+.check-ok { background: #eafaf0; color: #1f7a3d; padding: 8px 12px; margin-top: 10px; border: 1px solid #b7e6c6; }
 .output-json { background: #222; color: #dfd; padding: 12px; }
 button { padding: 6px 14px; margin-top: 8px; margin-right: 6px; }
 .file-button { display: inline-block; padding: 6px 14px; margin-top: 8px; border: 1px solid #999; cursor: pointer; }
