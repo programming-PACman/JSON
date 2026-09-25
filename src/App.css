@@ -19,5 +19,7 @@ button { padding: 6px 14px; margin-top: 8px; margin-right: 6px; }
 .array-row-input input { width: 100%; box-sizing: border-box; }
 .matrix-table { border-collapse: collapse; margin-bottom: 8px; }
 .matrix-table th, .matrix-table td { border: 1px solid #ccc; padding: 6px 8px; vertical-align: top; }
-.matrix-row-actions { white-space: nowrap; }
 .list-row { border: 1px solid #ccc; padding: 10px; margin-bottom: 8px; }
+.drag-handle { cursor: grab; padding: 4px 6px; color: #888; user-select: none; }
+.dragging { opacity: 0.4; }
+tr.dragging td { background: #f0f0f0; }

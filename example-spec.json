@@ -8,7 +8,7 @@
     { "name": "width", "label": "Ширина", "labelKey": "width_label", "type": "number", "min": 0, "default": 5 },
     { "name": "height", "label": "Высота", "labelKey": "height_label", "type": "number", "min": 0, "default": 3 },
     { "name": "area", "label": "Площадь (вычисляется)", "labelKey": "area_label", "type": "number", "disabled": true, "bind": { "computed": "width * height" } },
-    { "name": "tags", "label": "Теги", "labelKey": "tags_label", "type": "array", "itemType": "text", "maxItems": 3 },
+    { "name": "tags", "label": "Теги", "labelKey": "tags_label", "type": "array", "itemType": "text", "maxItems": 5 },
     {
       "name": "servers", "label": "Серверы", "labelKey": "servers_label", "type": "matrix",
       "columns": [
@@ -20,7 +20,7 @@
       "name": "contacts", "label": "Контакты", "labelKey": "contacts_label", "type": "list",
       "rowLabel": "Контакт {index}",
       "template": [
-        { "name": "fullName", "label": "ФИО", "type": "text" },
+        { "name": "fullName", "label": "ФИО", "type": "text", "required": true },
         { "name": "email", "label": "E-mail", "type": "email" }
       ]
     }
@@ -37,7 +37,8 @@
       "tags_label": "Tags",
       "servers_label": "Servers",
       "col_ip": "IP address",
-      "col_cores": "Cores"
+      "col_cores": "Cores",
+      "contacts_label": "Contacts"
     }
   }
 }

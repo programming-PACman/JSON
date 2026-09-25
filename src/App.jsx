@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import FormRenderer from './components/FormRenderer.jsx';
 import { validateSpec } from './core/validateSpec.js';
-import { validateValue, validateArrayItems, validateMatrixRows, hasAnyArrayError, hasAnyMatrixError } from './core/validateValue.js';
+import {
+  validateValue, validateArrayItems, validateMatrixRows, validateListRows,
+  hasAnyArrayError, hasAnyMatrixError, hasAnyListError,
+} from './core/validateValue.js';
 import { UI_STRINGS, resolveText } from './core/i18n.js';
 import { buildDependencyGraph, propagateChange } from './core/bindingEngine.js';
 
@@ -17,6 +20,20 @@ function computeInitialState(elements, graph) {
     visibility = { ...visibility, ...r.visibility };
   });
   return { values, dynamicOptions, visibility };
+}
+
+function validateElement(el, value, locale, label) {
+  if (el.type === 'array') return validateArrayItems(el, value, locale);
+  if (el.type === 'matrix') return validateMatrixRows(el, value, locale);
+  if (el.type === 'list') return validateListRows(el, value, locale);
+  return validateValue(el, value, locale, label);
+}
+
+function hasError(el, message) {
+  if (el.type === 'array') return hasAnyArrayError(message);
+  if (el.type === 'matrix') return hasAnyMatrixError(message);
+  if (el.type === 'list') return hasAnyListError(message);
+  return Boolean(message);
 }
 
 export default function App() {
@@ -65,9 +82,17 @@ export default function App() {
 
   const handleLoad = () => handleLoadFromText(text);
 
-  // "Проверить" — ТОЛЬКО валидация текста, без перестройки уже открытой формы.
-  // Полезно, когда правишь JSON во время заполнения формы и не хочешь
-  // потерять уже введённые значения ради проверки синтаксиса.
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setText(reader.result);
+      handleLoadFromText(reader.result);
+    };
+    reader.readAsText(file);
+  };
+
   const handleCheck = () => {
     let parsed;
     try {
@@ -82,8 +107,6 @@ export default function App() {
     setCheckedOk(errors.length === 0);
   };
 
-  // "Очистить форму" — сбрасывает введённые значения к default'ам спецификации,
-  // НЕ трогая саму спецификацию (в отличие от повторной загрузки).
   const handleClear = () => {
     if (!spec || !graph) return;
     const initial = computeInitialState(spec.elements, graph);
@@ -94,25 +117,11 @@ export default function App() {
     setCollected(null);
   };
 
-  const handleFile = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setText(reader.result);
-      handleLoadFromText(reader.result);
-    };
-    reader.readAsText(file);
-  };
-
   const resolvedLabel = (element) => resolveText(element, 'label', locale, spec?.translations) ?? element.label;
 
   const handleFieldChange = (name, value) => {
     const element = spec.elements.find((el) => el.name === name);
-    let message;
-    if (element.type === 'array') message = validateArrayItems(element, value, locale);
-    else if (element.type === 'matrix') message = validateMatrixRows(element, value, locale);
-    else message = validateValue(element, value, locale, resolvedLabel(element));
+    const message = validateElement(element, value, locale, resolvedLabel(element));
     setFieldErrors((prev) => ({ ...prev, [name]: message }));
 
     const updated = { ...values, [name]: value };
@@ -126,16 +135,8 @@ export default function App() {
     const errors = {};
     spec.elements.forEach((el) => {
       if (visibility[el.name] === false) return;
-      if (el.type === 'array') {
-        const itemErrors = validateArrayItems(el, values[el.name] || [], locale);
-        if (hasAnyArrayError(itemErrors)) errors[el.name] = itemErrors;
-      } else if (el.type === 'matrix') {
-        const rowErrors = validateMatrixRows(el, values[el.name] || [], locale);
-        if (hasAnyMatrixError(rowErrors)) errors[el.name] = rowErrors;
-      } else {
-        const message = validateValue(el, values[el.name], locale, resolvedLabel(el));
-        if (message) errors[el.name] = message;
-      }
+      const message = validateElement(el, values[el.name], locale, resolvedLabel(el));
+      if (hasError(el, message)) errors[el.name] = message;
     });
     setFieldErrors(errors);
     setCollected(Object.keys(errors).length === 0 ? values : null);

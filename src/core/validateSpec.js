@@ -1,9 +1,3 @@
-// Начальная версия валидации JSON-спецификации.
-// Проверяет только самое необходимое: наличие title и elements,
-// у каждого элемента — name/label/type, и что type — один из
-// поддерживаемых на этом этапе типов.
-// TODO: bind (data binding), array/matrix/list, уникальность имён — следующие этапы.
-
 import { extractIdentifiers } from './expression.js';
 
 const SUPPORTED_TYPES = ['text', 'textarea', 'number', 'email', 'date', 'select', 'radio', 'checkbox', 'array', 'matrix', 'list'];
@@ -67,7 +61,6 @@ export function validateSpec(spec) {
   return errors;
 }
 
-// Проверяет, что bind ссылается на существующие поля и выражения безопасны/корректны.
 function validateBindings(elements) {
   const errors = [];
   const names = new Set(elements.map((el) => el.name));

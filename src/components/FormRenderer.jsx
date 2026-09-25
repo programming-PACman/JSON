@@ -3,7 +3,6 @@ import ArrayField from './ArrayField.jsx';
 import MatrixField from './MatrixField.jsx';
 import ListField from './ListField.jsx';
 
-// Рендерит форму по спецификации.
 export default function FormRenderer({ spec, values, errors, locale, dynamicOptions, visibility, onFieldChange }) {
   return (
     <div className="form-renderer">
@@ -44,21 +43,20 @@ function Field({ element, value, error, locale, translations, options, onChange 
     );
   }
 
-  if (element.type === 'list') {
-    return (
-      <div className="field">
-        <span>{label}{element.required && <span className="required">*</span>}</span>
-        <ListField element={element} value={value} onChange={onChange} locale={locale} translations={translations} />
-        {error && <p className="field-error">{error}</p>}
-      </div>
-    );
-  }
-
   if (element.type === 'matrix') {
     return (
       <div className="field">
         <span>{label}{element.required && <span className="required">*</span>}</span>
         <MatrixField element={element} value={value} error={error} onChange={onChange} locale={locale} translations={translations} />
+      </div>
+    );
+  }
+
+  if (element.type === 'list') {
+    return (
+      <div className="field">
+        <span>{label}{element.required && <span className="required">*</span>}</span>
+        <ListField element={element} value={value} error={error} onChange={onChange} locale={locale} translations={translations} />
       </div>
     );
   }
@@ -69,12 +67,7 @@ function Field({ element, value, error, locale, translations, options, onChange 
         <span>{label}{element.required && <span className="required">*</span>}</span>
         {(options || []).map(resolveOption).map((opt) => (
           <label key={opt.value} className="radio-option">
-            <input
-              type="radio"
-              name={element.name}
-              checked={value === opt.value}
-              onChange={() => onChange(opt.value)}
-            />
+            <input type="radio" name={element.name} checked={value === opt.value} onChange={() => onChange(opt.value)} />
             {opt.label}
           </label>
         ))}

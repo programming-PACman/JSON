@@ -1,7 +1,5 @@
 import { evaluateSafeExpression, extractIdentifiers } from './expression.js';
 
-// Строит граф зависимостей: source -> [{ name, kind }] — какие поля зависят
-// от изменения данного поля через bind.optionsSource/computed/visibleWhen.
 export function buildDependencyGraph(elements) {
   const dependents = {};
   const byName = {};
@@ -26,8 +24,6 @@ export function buildDependencyGraph(elements) {
   return { dependents, byName };
 }
 
-// Пересчитывает всех, кто каскадно зависит от changedName.
-// Возвращает { values, dynamicOptions, visibility }.
 export function propagateChange(changedName, graph, values) {
   const newValues = { ...values };
   const dynamicOptions = {};
@@ -48,7 +44,6 @@ export function propagateChange(changedName, graph, values) {
           ? sourceValue.map((v) => (typeof v === 'object' ? v : { value: v, label: String(v) }))
           : [];
         dynamicOptions[name] = options;
-        // Сбрасываем значение, только если оно реально пропало из нового списка.
         if (!options.some((opt) => opt.value === newValues[name])) newValues[name] = undefined;
       }
 
@@ -64,15 +59,10 @@ export function propagateChange(changedName, graph, values) {
         try {
           visibility[name] = Boolean(evaluateSafeExpression(targetEl.bind.visibleWhen, newValues));
         } catch {
-          visibility[name] = true; // при ошибке лучше показать поле, чем скрыть данные пользователя
+          visibility[name] = true;
         }
-        // Раньше здесь стояло "newValues[name] = undefined" при скрытии — это было
-        // ОШИБКОЙ: скрытость поля не должна уничтожать его значение. Пользователь
-        // может скрыть/показать поле много раз (галочка вкл/выкл) — значение (включая
-        // default из спецификации) должно сохраняться на всё это время. Решение о
-        // том, включать ли значение скрытого поля в итоговый экспорт — отдельный
-        // вопрос, который решается в момент сборки результата (handleCollect),
-        // а не здесь, в момент простого переключения видимости.
+        // Скрытость поля НЕ уничтожает его значение (default/введённое) —
+        // значение должно пережить переключение видимости туда-обратно.
       }
 
       queue.push(name);
