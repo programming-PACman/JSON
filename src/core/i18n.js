@@ -1,4 +1,4 @@
-// i18n для двух РАЗНЫХ источников текста (см. обсуждение):
+// i18n для двух РАЗНЫХ источников текста:
 // 1. UI_STRINGS — текст самого приложения (кнопки, шаблоны ошибок).
 // 2. resolveText — текст ИЗ JSON-спецификации (label полей/опций), у которого
 //    есть перевод только если автор спецификации явно его предоставил
@@ -10,6 +10,9 @@ export const UI_STRINGS = {
     appTitle: 'JSON GUI Builder (начальная версия)',
     specLabel: 'JSON-спецификация',
     loadButton: 'Загрузить спецификацию',
+    checkButton: 'Проверить',
+    clearButton: 'Очистить форму',
+    checkOk: '✓ Спецификация корректна, ошибок не найдено',
     fileButton: 'Загрузить файл .json',
     collectButton: 'Собрать данные',
     invalidSpec: 'Спецификация некорректна:',
@@ -26,6 +29,9 @@ export const UI_STRINGS = {
     appTitle: 'JSON GUI Builder (starter version)',
     specLabel: 'JSON specification',
     loadButton: 'Load specification',
+    checkButton: 'Validate',
+    clearButton: 'Clear form',
+    checkOk: '✓ Specification is valid, no errors found',
     fileButton: 'Load .json file',
     collectButton: 'Collect data',
     invalidSpec: 'Specification is invalid:',

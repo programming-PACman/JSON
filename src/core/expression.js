@@ -1,12 +1,6 @@
-// Безопасный вычислитель для bind.computed/visibleWhen — раздел 9 ТЗ прямо
-// запрещает выполнение произвольного кода, поэтому НЕ используем eval()/Function().
-// Пока нужна только простая арифметика и сравнения — свой мини-парсер вместо
-// сторонней библиотеки (mathjs и т.п.): меньше кода, не нужна лишняя зависимость,
-// и мы точно знаем, что именно он умеет и не умеет выполнять.
-//
+// Безопасный вычислитель для bind.computed/visibleWhen — без eval()/Function().
 // Поддерживает: + - * / ( ) < > <= >= == != && || идентификаторы числа/строки.
-// НЕ поддерживает: вызовы функций, точечный доступ к свойствам — этого
-// достаточно, чтобы исключить основные векторы обхода "песочницы".
+// НЕ поддерживает: вызовы функций, точечный доступ к свойствам.
 
 const TOKEN_RE = /\s*(?:(\d+\.?\d*)|([A-Za-z_][A-Za-z0-9_]*)|("(?:[^"\\]|\\.)*")|(<=|>=|==|!=|&&|\|\||[+\-*\/()<>]))/g;
 
@@ -37,7 +31,6 @@ function tokenize(expression) {
   return tokens;
 }
 
-// Простой recursive-descent парсер с приоритетом операторов.
 function parse(tokens, scope) {
   let pos = 0;
   const peek = () => tokens[pos];
@@ -115,4 +108,20 @@ function parse(tokens, scope) {
 export function evaluateSafeExpression(expression, scope) {
   const tokens = tokenize(expression);
   return parse(tokens, scope);
+}
+
+// Проверяет ТОЛЬКО синтаксис выражения (незакрытые скобки, недопустимые символы,
+// лишние токены), не зная реальных значений: подставляет вместо каждого
+// идентификатора число 1 и пробует вычислить. Возвращает текст ошибки или null.
+// Нужна и валидатору спецификации, и конструктору (живая подсказка при вводе).
+export function checkExpressionSyntax(expression) {
+  if (typeof expression !== 'string' || expression.trim() === '') return 'Выражение пустое';
+  const scope = {};
+  extractIdentifiers(expression).forEach((id) => { scope[id] = 1; });
+  try {
+    evaluateSafeExpression(expression, scope);
+    return null;
+  } catch (e) {
+    return e.message;
+  }
 }

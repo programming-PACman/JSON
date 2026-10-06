@@ -3,12 +3,11 @@ import ArrayField from './ArrayField.jsx';
 import MatrixField from './MatrixField.jsx';
 import ListField from './ListField.jsx';
 
-// Рендерит форму по спецификации.
 export default function FormRenderer({ spec, values, errors, locale, dynamicOptions, visibility, onFieldChange }) {
   return (
     <div className="form-renderer">
       {spec.elements.map((element) => {
-        if (visibility?.[element.name] === false) return null;
+        if (element.hidden || visibility?.[element.name] === false) return null;
         return (
           <Field
             key={element.name}
@@ -29,6 +28,9 @@ export default function FormRenderer({ spec, values, errors, locale, dynamicOpti
 function Field({ element, value, error, locale, translations, options, onChange }) {
   const t = UI_STRINGS[locale] || UI_STRINGS.ru;
   const label = resolveText(element, 'label', locale, translations) ?? element.label;
+  const description = resolveText(element, 'description', locale, translations);
+  const hint = description ? <p className="field-hint">{description}</p> : null;
+  const placeholder = resolveText(element, 'placeholder', locale, translations);
 
   const resolveOption = (opt) => ({
     value: opt.value,
@@ -39,17 +41,8 @@ function Field({ element, value, error, locale, translations, options, onChange 
     return (
       <div className="field">
         <span>{label}{element.required && <span className="required">*</span>}</span>
+        {hint}
         <ArrayField element={element} value={value} error={error} onChange={onChange} />
-      </div>
-    );
-  }
-
-  if (element.type === 'list') {
-    return (
-      <div className="field">
-        <span>{label}{element.required && <span className="required">*</span>}</span>
-        <ListField element={element} value={value} onChange={onChange} locale={locale} translations={translations} />
-        {error && <p className="field-error">{error}</p>}
       </div>
     );
   }
@@ -58,7 +51,18 @@ function Field({ element, value, error, locale, translations, options, onChange 
     return (
       <div className="field">
         <span>{label}{element.required && <span className="required">*</span>}</span>
+        {hint}
         <MatrixField element={element} value={value} error={error} onChange={onChange} locale={locale} translations={translations} />
+      </div>
+    );
+  }
+
+  if (element.type === 'list') {
+    return (
+      <div className="field">
+        <span>{label}{element.required && <span className="required">*</span>}</span>
+        {hint}
+        <ListField element={element} value={value} error={error} onChange={onChange} locale={locale} translations={translations} />
       </div>
     );
   }
@@ -67,14 +71,10 @@ function Field({ element, value, error, locale, translations, options, onChange 
     return (
       <div className="field">
         <span>{label}{element.required && <span className="required">*</span>}</span>
+        {hint}
         {(options || []).map(resolveOption).map((opt) => (
           <label key={opt.value} className="radio-option">
-            <input
-              type="radio"
-              name={element.name}
-              checked={value === opt.value}
-              onChange={() => onChange(opt.value)}
-            />
+            <input type="radio" name={element.name} checked={value === opt.value} onChange={() => onChange(opt.value)} />
             {opt.label}
           </label>
         ))}
@@ -90,6 +90,7 @@ function Field({ element, value, error, locale, translations, options, onChange 
           <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
           {' '}{label}
         </label>
+        {hint}
         {error && <p className="field-error">{error}</p>}
       </div>
     );
@@ -106,13 +107,14 @@ function Field({ element, value, error, locale, translations, options, onChange 
       </select>
     );
   } else if (element.type === 'textarea') {
-    input = <textarea id={element.name} rows={4} value={value ?? ''} onChange={(e) => onChange(e.target.value)} disabled={element.disabled} />;
+    input = <textarea id={element.name} rows={4} placeholder={placeholder} value={value ?? ''} onChange={(e) => onChange(e.target.value)} disabled={element.disabled} />;
   } else {
     const inputType = element.type === 'number' ? 'number' : element.type === 'email' ? 'email' : element.type === 'date' ? 'date' : 'text';
     input = (
       <input
         id={element.name}
         type={inputType}
+        placeholder={placeholder}
         value={value ?? ''}
         disabled={element.disabled}
         onChange={(e) => onChange(element.type === 'number' ? Number(e.target.value) : e.target.value)}
@@ -123,6 +125,7 @@ function Field({ element, value, error, locale, translations, options, onChange 
   return (
     <div className="field">
       <label htmlFor={element.name}>{label}{element.required && <span className="required">*</span>}</label>
+      {hint}
       {input}
       {error && <p className="field-error">{error}</p>}
     </div>

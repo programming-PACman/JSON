@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import FormRenderer from './components/FormRenderer.jsx';
 import { validateSpec } from './core/validateSpec.js';
-import { validateValue, validateArrayItems, validateMatrixRows, hasAnyArrayError, hasAnyMatrixError } from './core/validateValue.js';
+import {
+  validateValue, validateArrayItems, validateMatrixRows, validateListRows,
+  hasAnyArrayError, hasAnyMatrixError, hasAnyListError,
+} from './core/validateValue.js';
 import { UI_STRINGS, resolveText } from './core/i18n.js';
 import { buildDependencyGraph, propagateChange } from './core/bindingEngine.js';
+import BuilderPanel from './builder/BuilderPanel.jsx';
 
 function computeInitialState(elements, graph) {
   let values = {};
@@ -19,6 +23,20 @@ function computeInitialState(elements, graph) {
   return { values, dynamicOptions, visibility };
 }
 
+function validateElement(el, value, locale, label) {
+  if (el.type === 'array') return validateArrayItems(el, value, locale);
+  if (el.type === 'matrix') return validateMatrixRows(el, value, locale);
+  if (el.type === 'list') return validateListRows(el, value, locale);
+  return validateValue(el, value, locale, label);
+}
+
+function hasError(el, message) {
+  if (el.type === 'array') return hasAnyArrayError(message);
+  if (el.type === 'matrix') return hasAnyMatrixError(message);
+  if (el.type === 'list') return hasAnyListError(message);
+  return Boolean(message);
+}
+
 export default function App() {
   const [locale, setLocale] = useState('ru');
   const [text, setText] = useState('');
@@ -30,10 +48,14 @@ export default function App() {
   const [visibility, setVisibility] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
   const [collected, setCollected] = useState(null);
+  const [checkedOk, setCheckedOk] = useState(false);
+  const [mode, setMode] = useState('json'); // 'json' | 'builder'
+  const [builderSpec, setBuilderSpec] = useState({ title: 'Новая форма', elements: [] });
 
   const t = UI_STRINGS[locale];
 
   const handleLoadFromText = (raw) => {
+    setCheckedOk(false);
     let parsed;
     try {
       parsed = JSON.parse(raw);
@@ -63,6 +85,27 @@ export default function App() {
 
   const handleLoad = () => handleLoadFromText(text);
 
+  // Конструктор меняет spec как объект — каждое изменение сразу сериализуется
+  // в text (чтобы режим "JSON" показывал актуальный результат при переключении)
+  // и сразу прогоняется через обычный конвейер загрузки, чтобы превью справа
+  // обновлялось вживую по мере редактирования, а не только по кнопке.
+  const handleBuilderChange = (newSpec) => {
+    setBuilderSpec(newSpec);
+    const json = JSON.stringify(newSpec, null, 2);
+    setText(json);
+    handleLoadFromText(json);
+  };
+
+  const switchToBuilder = () => {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.elements)) setBuilderSpec(parsed);
+    } catch {
+      // некорректный JSON — оставляем builderSpec как был, не теряем прогресс конструктора
+    }
+    setMode('builder');
+  };
+
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -74,14 +117,35 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const handleCheck = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      setSpecErrors([{ path: '$', message: `Некорректный JSON: ${e.message}` }]);
+      setCheckedOk(false);
+      return;
+    }
+    const errors = validateSpec(parsed);
+    setSpecErrors(errors);
+    setCheckedOk(errors.length === 0);
+  };
+
+  const handleClear = () => {
+    if (!spec || !graph) return;
+    const initial = computeInitialState(spec.elements, graph);
+    setValues(initial.values);
+    setDynamicOptions(initial.dynamicOptions);
+    setVisibility(initial.visibility);
+    setFieldErrors({});
+    setCollected(null);
+  };
+
   const resolvedLabel = (element) => resolveText(element, 'label', locale, spec?.translations) ?? element.label;
 
   const handleFieldChange = (name, value) => {
     const element = spec.elements.find((el) => el.name === name);
-    let message;
-    if (element.type === 'array') message = validateArrayItems(element, value, locale);
-    else if (element.type === 'matrix') message = validateMatrixRows(element, value, locale);
-    else message = validateValue(element, value, locale, resolvedLabel(element));
+    const message = validateElement(element, value, locale, resolvedLabel(element));
     setFieldErrors((prev) => ({ ...prev, [name]: message }));
 
     const updated = { ...values, [name]: value };
@@ -95,16 +159,8 @@ export default function App() {
     const errors = {};
     spec.elements.forEach((el) => {
       if (visibility[el.name] === false) return;
-      if (el.type === 'array') {
-        const itemErrors = validateArrayItems(el, values[el.name] || [], locale);
-        if (hasAnyArrayError(itemErrors)) errors[el.name] = itemErrors;
-      } else if (el.type === 'matrix') {
-        const rowErrors = validateMatrixRows(el, values[el.name] || [], locale);
-        if (hasAnyMatrixError(rowErrors)) errors[el.name] = rowErrors;
-      } else {
-        const message = validateValue(el, values[el.name], locale, resolvedLabel(el));
-        if (message) errors[el.name] = message;
-      }
+      const message = validateElement(el, values[el.name], locale, resolvedLabel(el));
+      if (hasError(el, message)) errors[el.name] = message;
     });
     setFieldErrors(errors);
     setCollected(Object.keys(errors).length === 0 ? values : null);
@@ -121,19 +177,33 @@ export default function App() {
 
       <div className="app-columns">
         <section>
-          <label htmlFor="spec-text">{t.specLabel}</label>
-          <textarea
-            id="spec-text"
-            rows={14}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder='{"title": "...", "elements": [...]}'
-          />
-          <button type="button" onClick={handleLoad}>{t.loadButton}</button>
-          <label className="file-button">
-            {t.fileButton}
-            <input type="file" accept=".json" onChange={handleFile} hidden />
-          </label>
+          <div className="mode-switch">
+            <button type="button" className={mode === 'json' ? 'active' : 'secondary'} onClick={() => setMode('json')}>JSON</button>
+            <button type="button" className={mode === 'builder' ? 'active' : 'secondary'} onClick={switchToBuilder}>Конструктор</button>
+          </div>
+
+          {mode === 'json' ? (
+            <>
+              <label htmlFor="spec-text">{t.specLabel}</label>
+              <textarea
+                id="spec-text"
+                rows={14}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder='{"title": "...", "elements": [...]}'
+              />
+              <button type="button" onClick={handleLoad}>{t.loadButton}</button>
+              <button type="button" onClick={handleCheck}>{t.checkButton}</button>
+              <label className="file-button">
+                {t.fileButton}
+                <input type="file" accept=".json" onChange={handleFile} hidden />
+              </label>
+            </>
+          ) : (
+            <BuilderPanel spec={builderSpec} errors={specErrors} onChange={handleBuilderChange} />
+          )}
+
+          {checkedOk && specErrors.length === 0 && <p className="check-ok">{t.checkOk}</p>}
 
           {specErrors.length > 0 && (
             <div className="error-list">
@@ -151,6 +221,7 @@ export default function App() {
               <h2>{resolveText(spec, 'title', locale, spec.translations) ?? spec.title}</h2>
               <FormRenderer spec={spec} values={values} errors={fieldErrors} locale={locale} dynamicOptions={dynamicOptions} visibility={visibility} onFieldChange={handleFieldChange} />
               <button type="button" onClick={handleCollect}>{t.collectButton}</button>
+              <button type="button" onClick={handleClear}>{t.clearButton}</button>
               {collected && <pre className="output-json">{JSON.stringify(collected, null, 2)}</pre>}
             </>
           )}

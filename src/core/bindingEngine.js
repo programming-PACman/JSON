@@ -1,7 +1,5 @@
 import { evaluateSafeExpression, extractIdentifiers } from './expression.js';
 
-// Строит граф зависимостей: source -> [{ name, kind }] — какие поля зависят
-// от изменения данного поля через bind.optionsSource/computed/visibleWhen.
 export function buildDependencyGraph(elements) {
   const dependents = {};
   const byName = {};
@@ -26,8 +24,6 @@ export function buildDependencyGraph(elements) {
   return { dependents, byName };
 }
 
-// Пересчитывает всех, кто каскадно зависит от changedName.
-// Возвращает { values, dynamicOptions, visibility }.
 export function propagateChange(changedName, graph, values) {
   const newValues = { ...values };
   const dynamicOptions = {};
@@ -48,7 +44,6 @@ export function propagateChange(changedName, graph, values) {
           ? sourceValue.map((v) => (typeof v === 'object' ? v : { value: v, label: String(v) }))
           : [];
         dynamicOptions[name] = options;
-        // Сбрасываем значение, только если оно реально пропало из нового списка.
         if (!options.some((opt) => opt.value === newValues[name])) newValues[name] = undefined;
       }
 
@@ -62,17 +57,16 @@ export function propagateChange(changedName, graph, values) {
 
       if (kind === 'visibility' && targetEl?.bind?.visibleWhen) {
         try {
-          visibility[name] = Boolean(evaluateSafeExpression(targetEl.bind.visibleWhen, newValues));
+          // Ещё не заполненное поле — это не "неизвестный идентификатор", а пустое
+          // значение (null): условие "тип == \"other\"" при невыбранном типе просто
+          // ложно, и зависимое поле должно быть скрыто с самого начала.
+          const scope = { ...emptyScope(graph), ...newValues };
+          visibility[name] = Boolean(evaluateSafeExpression(targetEl.bind.visibleWhen, scope));
         } catch {
-          visibility[name] = true; // при ошибке лучше показать поле, чем скрыть данные пользователя
+          visibility[name] = true;
         }
-        // Раньше здесь стояло "newValues[name] = undefined" при скрытии — это было
-        // ОШИБКОЙ: скрытость поля не должна уничтожать его значение. Пользователь
-        // может скрыть/показать поле много раз (галочка вкл/выкл) — значение (включая
-        // default из спецификации) должно сохраняться на всё это время. Решение о
-        // том, включать ли значение скрытого поля в итоговый экспорт — отдельный
-        // вопрос, который решается в момент сборки результата (handleCollect),
-        // а не здесь, в момент простого переключения видимости.
+        // Скрытость поля НЕ уничтожает его значение (default/введённое) —
+        // значение должно пережить переключение видимости туда-обратно.
       }
 
       queue.push(name);
@@ -80,4 +74,27 @@ export function propagateChange(changedName, graph, values) {
   }
 
   return { values: newValues, dynamicOptions, visibility };
+}
+
+function emptyScope(graph) {
+  const scope = {};
+  Object.keys(graph.byName).forEach((n) => { scope[n] = null; });
+  return scope;
+}
+
+// Стартовое состояние формы: default'ы + первичный прогон ВСЕХ зависимостей
+// (а не только тех, чей источник уже имеет значение) — иначе поля с visibleWhen
+// от пустого источника оказались бы видимыми до первого действия пользователя.
+export function computeInitialState(elements, graph) {
+  let values = {};
+  elements.forEach((el) => { if (el.default !== undefined) values[el.name] = el.default; });
+  let dynamicOptions = {};
+  let visibility = {};
+  Object.keys(graph.dependents).forEach((sourceName) => {
+    const r = propagateChange(sourceName, graph, values);
+    values = r.values;
+    dynamicOptions = { ...dynamicOptions, ...r.dynamicOptions };
+    visibility = { ...visibility, ...r.visibility };
+  });
+  return { values, dynamicOptions, visibility };
 }

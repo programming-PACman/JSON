@@ -1,8 +1,5 @@
 import { UI_STRINGS } from './i18n.js';
 
-// Проверка значения поля при вводе.
-// locale/label — для перевода текста ошибки; label уже РЕЗОЛВЛЕН вызывающим
-// кодом через resolveText (эта функция не обязана знать про translations).
 export function validateValue(element, value, locale = 'ru', label = element.label) {
   const t = UI_STRINGS[locale] || UI_STRINGS.ru;
 
@@ -30,7 +27,6 @@ export function validateValue(element, value, locale = 'ru', label = element.lab
 }
 
 // Валидирует КАЖДЫЙ элемент array по правилам itemType.
-// Возвращает массив вида ["ошибка" | null, ...], параллельный items.
 export function validateArrayItems(element, items, locale) {
   if (!Array.isArray(items)) return [];
   const itemElement = { label: element.label, type: element.itemType };
@@ -38,7 +34,6 @@ export function validateArrayItems(element, items, locale) {
 }
 
 // Валидирует КАЖДУЮ ячейку КАЖДОЙ строки matrix по правилам её столбца.
-// Возвращает массив вида [{ colName: "ошибка" }, ...], параллельный rows.
 export function validateMatrixRows(element, rows, locale) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => {
@@ -51,5 +46,20 @@ export function validateMatrixRows(element, rows, locale) {
   });
 }
 
+// Валидирует КАЖДОЕ поле КАЖДОЙ записи list по правилам поля из template —
+// тот же паттерн, что validateMatrixRows, просто "столбцы" называются "template".
+export function validateListRows(element, rows, locale) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((row) => {
+    const rowErrors = {};
+    element.template.forEach((field) => {
+      const message = validateValue(field, row?.[field.name], locale);
+      if (message) rowErrors[field.name] = message;
+    });
+    return rowErrors;
+  });
+}
+
 export function hasAnyArrayError(errs) { return errs.some((m) => m !== null); }
 export function hasAnyMatrixError(errs) { return errs.some((row) => Object.keys(row).length > 0); }
+export function hasAnyListError(errs) { return errs.some((row) => Object.keys(row).length > 0); }
