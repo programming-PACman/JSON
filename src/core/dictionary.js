@@ -11,6 +11,12 @@
 
 export const LOCALES = ['ru', 'en'];
 
+// Базовый язык: на нём написаны исходные тексты (label, title и т.д.) в самой
+// спецификации, поэтому для него отдельный перевод не нужен — fallback на
+// исходный текст и есть «перевод». «Не хватает перевода» имеет смысл
+// только для остальных языков.
+export const BASE_LOCALE = 'ru';
+
 export function emptyDictionary() {
   return Object.fromEntries(LOCALES.map((l) => [l, {}]));
 }
@@ -96,7 +102,9 @@ export function collectSpecKeys(spec) {
 }
 
 // Ключи, которым нет перевода для locale ни в локальных translations, ни в общем словаре.
+// Для базового языка всегда [] (см. BASE_LOCALE).
 export function findMissingKeys(spec, shared, locale) {
+  if (locale === BASE_LOCALE) return [];
   const merged = mergeTranslations(shared, spec?.translations);
   return collectSpecKeys(spec).filter((k) => merged[locale]?.[k] === undefined);
 }

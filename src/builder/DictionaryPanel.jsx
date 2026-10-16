@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { UI_STRINGS } from '../core/i18n.js';
 import {
-  LOCALES, allKeys, setEntry, removeKey, isValidKey, findMissingKeys,
+  LOCALES, BASE_LOCALE, allKeys, setEntry, removeKey, isValidKey, findMissingKeys,
   parseDictionary, serializeDictionary, mergeDictionaries,
 } from '../core/dictionary.js';
 
@@ -58,7 +58,7 @@ export default function DictionaryPanel({ dictionary, spec, locale, onChange }) 
 
       {spec && (
         <p className={missing.length ? 'dictionary-missing' : 'dictionary-ok'}>
-          {missing.length ? t.dictMissing(missing.length) : t.dictAllTranslated}
+          {missing.length ? t.dictMissing(missing.length) : locale === BASE_LOCALE ? t.dictBaseLocale : t.dictAllTranslated}
           {missing.map((k) => (
             <button key={k} type="button" className="secondary dictionary-chip" onClick={() => setDraftKey(k)}>{k}</button>
           ))}
