@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import FormRenderer from './components/FormRenderer.jsx';
 import { validateSpec } from './core/validateSpec.js';
 import {
@@ -8,6 +8,8 @@ import {
 import { UI_STRINGS, resolveText } from './core/i18n.js';
 import { buildDependencyGraph, propagateChange } from './core/bindingEngine.js';
 import BuilderPanel from './builder/BuilderPanel.jsx';
+import DictionaryPanel from './builder/DictionaryPanel.jsx';
+import { loadDictionary, saveDictionary, withSharedDictionary } from './core/dictionary.js';
 
 function computeInitialState(elements, graph) {
   let values = {};
@@ -49,10 +51,16 @@ export default function App() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [collected, setCollected] = useState(null);
   const [checkedOk, setCheckedOk] = useState(false);
-  const [mode, setMode] = useState('json'); // 'json' | 'builder'
+  const [mode, setMode] = useState('json'); // 'json' | 'builder' | 'dictionary'
+  const [dictionary, setDictionary] = useState(() => loadDictionary());
   const [builderSpec, setBuilderSpec] = useState({ title: 'Новая форма', elements: [] });
 
   const t = UI_STRINGS[locale];
+
+  useEffect(() => { saveDictionary(dictionary); }, [dictionary]);
+
+  // spec с переводами, слитыми с общим словарём (локальные translations приоритетнее)
+  const effectiveSpec = withSharedDictionary(spec, dictionary);
 
   const handleLoadFromText = (raw) => {
     setCheckedOk(false);
@@ -141,7 +149,7 @@ export default function App() {
     setCollected(null);
   };
 
-  const resolvedLabel = (element) => resolveText(element, 'label', locale, spec?.translations) ?? element.label;
+  const resolvedLabel = (element) => resolveText(element, 'label', locale, effectiveSpec?.translations) ?? element.label;
 
   const handleFieldChange = (name, value) => {
     const element = spec.elements.find((el) => el.name === name);
@@ -180,6 +188,7 @@ export default function App() {
           <div className="mode-switch">
             <button type="button" className={mode === 'json' ? 'active' : 'secondary'} onClick={() => setMode('json')}>JSON</button>
             <button type="button" className={mode === 'builder' ? 'active' : 'secondary'} onClick={switchToBuilder}>Конструктор</button>
+            <button type="button" className={mode === 'dictionary' ? 'active' : 'secondary'} onClick={() => setMode('dictionary')}>{t.dictTab}</button>
           </div>
 
           {mode === 'json' ? (
@@ -199,8 +208,10 @@ export default function App() {
                 <input type="file" accept=".json" onChange={handleFile} hidden />
               </label>
             </>
-          ) : (
+          ) : mode === 'builder' ? (
             <BuilderPanel spec={builderSpec} errors={specErrors} onChange={handleBuilderChange} />
+          ) : (
+            <DictionaryPanel dictionary={dictionary} spec={spec} locale={locale} onChange={setDictionary} />
           )}
 
           {checkedOk && specErrors.length === 0 && <p className="check-ok">{t.checkOk}</p>}
@@ -218,8 +229,8 @@ export default function App() {
         <section>
           {spec && (
             <>
-              <h2>{resolveText(spec, 'title', locale, spec.translations) ?? spec.title}</h2>
-              <FormRenderer spec={spec} values={values} errors={fieldErrors} locale={locale} dynamicOptions={dynamicOptions} visibility={visibility} onFieldChange={handleFieldChange} />
+              <h2>{resolveText(spec, 'title', locale, effectiveSpec.translations) ?? spec.title}</h2>
+              <FormRenderer spec={effectiveSpec} values={values} errors={fieldErrors} locale={locale} dynamicOptions={dynamicOptions} visibility={visibility} onFieldChange={handleFieldChange} />
               <button type="button" onClick={handleCollect}>{t.collectButton}</button>
               <button type="button" onClick={handleClear}>{t.clearButton}</button>
               {collected && <pre className="output-json">{JSON.stringify(collected, null, 2)}</pre>}

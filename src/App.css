@@ -47,3 +47,18 @@ tr.dragging td { background: #f0f0f0; }
 
 .options-editor-row, .fieldlist-editor-row { display: flex; gap: 6px; margin-bottom: 4px; }
 .condition-editor { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* Общий словарь переводов */
+.dictionary-panel { display: flex; flex-direction: column; gap: 10px; }
+.dictionary-hint { color: #666; font-size: 14px; margin: 0; }
+.dictionary-missing { color: #b45309; margin: 0; }
+.dictionary-ok { color: #15803d; margin: 0; }
+.dictionary-chip { margin-left: 6px; padding: 2px 8px; font-size: 12px; }
+.dictionary-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.dictionary-add input { flex: 1 1 120px; min-width: 0; }
+.dictionary-error { color: #b91c1c; margin: 0; }
+.dictionary-empty { color: #888; margin: 0; }
+.dictionary-table { width: 100%; border-collapse: collapse; }
+.dictionary-table th, .dictionary-table td { border-bottom: 1px solid #ddd; padding: 4px; text-align: left; }
+.dictionary-table input { width: 100%; box-sizing: border-box; }
+.dictionary-io { display: flex; gap: 8px; align-items: center; }
