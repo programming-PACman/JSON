@@ -7,6 +7,7 @@ import {
 } from './core/validateValue.js';
 import { UI_STRINGS, resolveText } from './core/i18n.js';
 import { buildDependencyGraph, propagateChange } from './core/bindingEngine.js';
+import BuilderPanel from './builder/BuilderPanel.jsx';
 
 function computeInitialState(elements, graph) {
   let values = {};
@@ -48,6 +49,8 @@ export default function App() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [collected, setCollected] = useState(null);
   const [checkedOk, setCheckedOk] = useState(false);
+  const [mode, setMode] = useState('json'); // 'json' | 'builder'
+  const [builderSpec, setBuilderSpec] = useState({ title: 'Новая форма', elements: [] });
 
   const t = UI_STRINGS[locale];
 
@@ -81,6 +84,27 @@ export default function App() {
   };
 
   const handleLoad = () => handleLoadFromText(text);
+
+  // Конструктор меняет spec как объект — каждое изменение сразу сериализуется
+  // в text (чтобы режим "JSON" показывал актуальный результат при переключении)
+  // и сразу прогоняется через обычный конвейер загрузки, чтобы превью справа
+  // обновлялось вживую по мере редактирования, а не только по кнопке.
+  const handleBuilderChange = (newSpec) => {
+    setBuilderSpec(newSpec);
+    const json = JSON.stringify(newSpec, null, 2);
+    setText(json);
+    handleLoadFromText(json);
+  };
+
+  const switchToBuilder = () => {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.elements)) setBuilderSpec(parsed);
+    } catch {
+      // некорректный JSON — оставляем builderSpec как был, не теряем прогресс конструктора
+    }
+    setMode('builder');
+  };
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -153,20 +177,31 @@ export default function App() {
 
       <div className="app-columns">
         <section>
-          <label htmlFor="spec-text">{t.specLabel}</label>
-          <textarea
-            id="spec-text"
-            rows={14}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder='{"title": "...", "elements": [...]}'
-          />
-          <button type="button" onClick={handleLoad}>{t.loadButton}</button>
-          <button type="button" onClick={handleCheck}>{t.checkButton}</button>
-          <label className="file-button">
-            {t.fileButton}
-            <input type="file" accept=".json" onChange={handleFile} hidden />
-          </label>
+          <div className="mode-switch">
+            <button type="button" className={mode === 'json' ? 'active' : 'secondary'} onClick={() => setMode('json')}>JSON</button>
+            <button type="button" className={mode === 'builder' ? 'active' : 'secondary'} onClick={switchToBuilder}>Конструктор</button>
+          </div>
+
+          {mode === 'json' ? (
+            <>
+              <label htmlFor="spec-text">{t.specLabel}</label>
+              <textarea
+                id="spec-text"
+                rows={14}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder='{"title": "...", "elements": [...]}'
+              />
+              <button type="button" onClick={handleLoad}>{t.loadButton}</button>
+              <button type="button" onClick={handleCheck}>{t.checkButton}</button>
+              <label className="file-button">
+                {t.fileButton}
+                <input type="file" accept=".json" onChange={handleFile} hidden />
+              </label>
+            </>
+          ) : (
+            <BuilderPanel spec={builderSpec} errors={specErrors} onChange={handleBuilderChange} />
+          )}
 
           {checkedOk && specErrors.length === 0 && <p className="check-ok">{t.checkOk}</p>}
 

@@ -57,7 +57,11 @@ export function propagateChange(changedName, graph, values) {
 
       if (kind === 'visibility' && targetEl?.bind?.visibleWhen) {
         try {
-          visibility[name] = Boolean(evaluateSafeExpression(targetEl.bind.visibleWhen, newValues));
+          // Ещё не заполненное поле — это не "неизвестный идентификатор", а пустое
+          // значение (null): условие "тип == \"other\"" при невыбранном типе просто
+          // ложно, и зависимое поле должно быть скрыто с самого начала.
+          const scope = { ...emptyScope(graph), ...newValues };
+          visibility[name] = Boolean(evaluateSafeExpression(targetEl.bind.visibleWhen, scope));
         } catch {
           visibility[name] = true;
         }
@@ -70,4 +74,27 @@ export function propagateChange(changedName, graph, values) {
   }
 
   return { values: newValues, dynamicOptions, visibility };
+}
+
+function emptyScope(graph) {
+  const scope = {};
+  Object.keys(graph.byName).forEach((n) => { scope[n] = null; });
+  return scope;
+}
+
+// Стартовое состояние формы: default'ы + первичный прогон ВСЕХ зависимостей
+// (а не только тех, чей источник уже имеет значение) — иначе поля с visibleWhen
+// от пустого источника оказались бы видимыми до первого действия пользователя.
+export function computeInitialState(elements, graph) {
+  let values = {};
+  elements.forEach((el) => { if (el.default !== undefined) values[el.name] = el.default; });
+  let dynamicOptions = {};
+  let visibility = {};
+  Object.keys(graph.dependents).forEach((sourceName) => {
+    const r = propagateChange(sourceName, graph, values);
+    values = r.values;
+    dynamicOptions = { ...dynamicOptions, ...r.dynamicOptions };
+    visibility = { ...visibility, ...r.visibility };
+  });
+  return { values, dynamicOptions, visibility };
 }

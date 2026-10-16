@@ -109,3 +109,19 @@ export function evaluateSafeExpression(expression, scope) {
   const tokens = tokenize(expression);
   return parse(tokens, scope);
 }
+
+// Проверяет ТОЛЬКО синтаксис выражения (незакрытые скобки, недопустимые символы,
+// лишние токены), не зная реальных значений: подставляет вместо каждого
+// идентификатора число 1 и пробует вычислить. Возвращает текст ошибки или null.
+// Нужна и валидатору спецификации, и конструктору (живая подсказка при вводе).
+export function checkExpressionSyntax(expression) {
+  if (typeof expression !== 'string' || expression.trim() === '') return 'Выражение пустое';
+  const scope = {};
+  extractIdentifiers(expression).forEach((id) => { scope[id] = 1; });
+  try {
+    evaluateSafeExpression(expression, scope);
+    return null;
+  } catch (e) {
+    return e.message;
+  }
+}
