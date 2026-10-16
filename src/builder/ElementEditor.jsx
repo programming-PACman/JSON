@@ -1,4 +1,4 @@
-import { ELEMENT_TYPES, isValidName, withProp, setBind, changeType } from './builderUtils.js';
+import { ELEMENT_TYPES, isValidName, withProp, setBind, changeType, initialCondition } from './builderUtils.js';
 import OptionsEditor from './OptionsEditor.jsx';
 import FieldListEditor from './FieldListEditor.jsx';
 import ConditionEditor from './ConditionEditor.jsx';
@@ -122,11 +122,15 @@ export default function ElementEditor({ element, otherElements, onChange, onRena
             <input
               type="checkbox"
               checked={!!element.bind?.visibleWhen}
-              onChange={(e) => setBindKey('visibleWhen', e.target.checked ? '' : undefined)}
+              disabled={otherElements.length === 0 && !element.bind?.visibleWhen}
+              onChange={(e) => setBindKey('visibleWhen', e.target.checked ? initialCondition(otherElements) : undefined)}
             />
             {' '}Показывать по условию
           </label>
         </div>
+        {otherElements.length === 0 && !element.bind?.visibleWhen && (
+          <p className="field-hint">Нет других полей, от которых можно зависеть.</p>
+        )}
         {element.bind?.visibleWhen !== undefined && (
           <ConditionEditor
             expression={element.bind.visibleWhen}
