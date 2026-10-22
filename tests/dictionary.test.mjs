@@ -39,9 +39,11 @@ check('allKeys по алфавиту', JSON.stringify(allKeys({ ru: { b: '1' }, 
 const keys = collectSpecKeys(spec);
 check('collectSpecKeys находит titleKey и labelKey (в т.ч. колонки matrix)', keys.includes('form_title') && keys.includes('col_ip') && keys.includes('username_label'));
 check('findMissingKeys en: всё переведено в spec', findMissingKeys(spec, emptyDictionary(), 'en').length === 0);
-const ruMissing = findMissingKeys(spec, emptyDictionary(), 'ru');
-check('findMissingKeys ru: нет ru-переводов → все ключи missing', ruMissing.length === keys.length);
-check('общий словарь закрывает пропуск', !findMissingKeys(spec, shared, 'ru').includes('username_label'));
+check('findMissingKeys ru (базовый язык): текст в label, пропусков нет даже без ru-переводов', findMissingKeys(spec, emptyDictionary(), 'ru').length === 0);
+const noEn = { ...spec, translations: { en: { username_label: 'Username' } } };
+const enMissing = findMissingKeys(noEn, emptyDictionary(), 'en');
+check('findMissingKeys en: не переведённые ключи находятся', enMissing.length === keys.length - 1 && !enMissing.includes('username_label'));
+check('общий словарь закрывает пропуск для en', !findMissingKeys(noEn, { en: { width_label: 'Width' } }, 'en').includes('width_label'));
 
 // нормализация и импорт
 check('normalize отбрасывает мусор', JSON.stringify(normalizeDictionary({ ru: { 'bad key': 'x', ok: 'y', n: 5 }, en: 'oops' })) === '{"ru":{"ok":"y"},"en":{}}');

@@ -38,6 +38,7 @@ export const UI_STRINGS = {
     dictImportError: 'Не удалось прочитать словарь',
     dictMissing: (n) => `Нет перевода для текущего языка у ключей формы: ${n}`,
     dictAllTranslated: 'Все ключи текущей формы переведены',
+    dictBaseLocale: 'Русский — базовый язык формы: тексты берутся из её полей label, перевод не требуется',
   },
   en: {
     appTitle: 'JSON GUI Builder (starter version)',
@@ -71,6 +72,7 @@ export const UI_STRINGS = {
     dictImportError: 'Could not read the dictionary',
     dictMissing: (n) => `Keys of the current form with no translation for this language: ${n}`,
     dictAllTranslated: 'All keys of the current form are translated',
+    dictBaseLocale: 'Russian is the form\'s base language: texts come from its label fields, no translation needed',
   },
 };
 
