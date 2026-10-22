@@ -219,6 +219,17 @@ export function defaultConditionValue(sourceElement) {
   return '';
 }
 
+// Условие, которое подставляется при включении "Показывать по условию":
+// "<первое другое поле> == <значение по умолчанию для его типа>".
+// Должно быть НЕпустым: setBind удаляет пустые значения, и с пустой строкой
+// чекбокс "Показывать по условию" просто не включался бы.
+// Если других полей нет — вернёт '' (зависеть не от чего).
+export function initialCondition(otherElements) {
+  const first = otherElements?.[0];
+  if (!first) return '';
+  return buildCondition({ field: first.name, op: '==', value: defaultConditionValue(first) });
+}
+
 /* ---------- зависимости: список, сводка, ошибки ---------- */
 
 export function listDependencies(spec) {

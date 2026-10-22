@@ -1,4 +1,4 @@
-import { OPERATORS, buildCondition, parseCondition, defaultConditionValue } from './builderUtils.js';
+import { OPERATORS, buildCondition, parseCondition, defaultConditionValue, initialCondition } from './builderUtils.js';
 
 // Визуальный конструктор для bind.visibleWhen: "поле [равно] значение".
 // Если текущее выражение сложнее простого "поле оп значение" (например,
@@ -15,7 +15,7 @@ export default function ConditionEditor({ expression, otherElements, onChange })
           Выражение сложнее, чем «поле оператор значение» — редактируется как текст.
         </p>
         <input value={expression} onChange={(e) => onChange(e.target.value)} />
-        <button type="button" onClick={() => onChange('')}>Очистить и начать визуально</button>
+        <button type="button" onClick={() => onChange(initialCondition(otherElements))}>Очистить и начать визуально</button>
       </div>
     );
   }
