@@ -3,7 +3,7 @@
 // JSON — результат JSON.stringify(spec), а не место, где пользователь собирает структуру.
 // Ни одна функция здесь не знает про React, поэтому их можно тестировать в Node.
 
-import { extractIdentifiers } from '../core/expression.js';
+import { extractIdentifiers, checkExpressionSyntax } from '../core/expression.js';
 
 export const ELEMENT_TYPES = [
   { type: 'text', label: 'Текст' },
@@ -269,4 +269,116 @@ export function errorsForElement(errors, element, index) {
   const byIndex = new RegExp(`^elements\\[${index}\\](\\.|\\[|$)`);
   const byName = `elements[name=${element.name}]`;
   return errors.filter((e) => byIndex.test(e.path) || e.path.startsWith(byName));
+}
+
+/* ---------- кандидаты для зависимостей: нельзя создать цикл или бессмысленную связь ---------- */
+
+// Имена полей, которые (прямо или через цепочку) зависят от поля `name`.
+// Если сделать `name` зависимым от любого из них — получится цикл.
+export function downstreamOf(spec, name) {
+  const edges = listDependencies(spec);
+  const result = new Set();
+  const queue = [name];
+  while (queue.length) {
+    const current = queue.shift();
+    edges.filter((e) => e.source === current).forEach((e) => {
+      if (!result.has(e.target)) { result.add(e.target); queue.push(e.target); }
+    });
+  }
+  return result;
+}
+
+// От каких полей МОЖЕТ зависеть элемент spec.elements[index]:
+//  - scalar: для visibleWhen и computed — обычные поля (не коллекции), кроме себя
+//    и тех, кто уже зависит от него (иначе цикл);
+//  - arrays: для optionsSource — только поля типа array (варианты берутся из значения-списка).
+export function dependencySources(spec, index) {
+  const self = spec.elements[index];
+  if (!self) return { scalar: [], arrays: [] };
+  const blocked = downstreamOf(spec, self.name);
+  const free = spec.elements.filter((el, i) => i !== index && !blocked.has(el.name));
+  return {
+    scalar: free.filter((el) => !COLLECTION_TYPES.includes(el.type)),
+    arrays: free.filter((el) => el.type === 'array'),
+  };
+}
+
+/* ---------- общие свойства поля ---------- */
+
+// Какие общие свойства имеет смысл показывать для типа поля.
+export function supportsProp(type, prop) {
+  const collection = COLLECTION_TYPES.includes(type);
+  switch (prop) {
+    case 'placeholder': return ['text', 'textarea', 'number', 'email'].includes(type);
+    case 'default': return !collection;
+    case 'disabled': return !collection;
+    case 'description': case 'hidden': return true;
+    default: return true;
+  }
+}
+
+// Строка из поля ввода -> значение default нужного типа (undefined = "не задано").
+export function coerceDefault(element, raw) {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  if (element.type === 'checkbox') return raw === true || raw === 'true';
+  if (element.type === 'number') {
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return String(raw);
+}
+
+// Перестановка вариантов select/radio (и любых списков): возвращает новый массив.
+export function moveItem(list, from, to) {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+  const next = [...list];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+// Уникальное значение для нового варианта: option_1, option_2, ... (не совпадает с существующими).
+export function nextOptionValue(options) {
+  const used = new Set((options || []).map((o) => o.value));
+  let i = (options || []).length + 1;
+  while (used.has(`option_${i}`)) i += 1;
+  return `option_${i}`;
+}
+
+/* ---------- подсказки для bind.computed ---------- */
+
+export const OPERATOR_CHIPS = ['+', '-', '*', '/', '(', ')'];
+
+export function expressionProblem(expression, sourceNames) {
+  if (!expression) return null;
+  const syntax = checkExpressionSyntax(expression);
+  if (syntax) return `Некорректное выражение: ${syntax}`;
+  const unknown = extractIdentifiers(expression).filter((id) => !['true', 'false'].includes(id) && !sourceNames.includes(id));
+  if (unknown.length) return `Нет такого поля (или оно создаёт цикл): ${unknown.join(', ')}`;
+  return null;
+}
+
+export function appendToExpression(expression, token) {
+  const base = expression ?? '';
+  if (base === '') return token;
+  // перед скобкой/оператором и после — пробелы для читаемости
+  return `${base} ${token}`;
+}
+
+
+/* ---------- имя файла для скачивания ---------- */
+
+const TRANSLIT = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm',
+  н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch',
+  ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+};
+
+// "Пример формы" -> "Primer_formy". Кириллицу транслитерируем, чтобы имя файла одинаково
+// работало в любой ОС/браузере (часть окружений заменяет не-ASCII имена на "download").
+export function fileSafeName(title, fallback = 'form') {
+  const latin = String(title ?? '').toLowerCase().replace(/[а-яё]/g, (ch) => TRANSLIT[ch] ?? '');
+  const cleaned = latin.replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!cleaned) return fallback;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }

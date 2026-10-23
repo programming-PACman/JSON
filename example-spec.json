@@ -18,10 +18,10 @@
     },
     {
       "name": "contacts", "label": "Контакты", "labelKey": "contacts_label", "type": "list",
-      "rowLabel": "Контакт {index}",
+      "rowLabel": "Контакт {index}", "rowLabelKey": "contact_row",
       "template": [
-        { "name": "fullName", "label": "ФИО", "type": "text", "required": true },
-        { "name": "email", "label": "E-mail", "type": "email" }
+        { "name": "fullName", "label": "ФИО", "labelKey": "contact_fullname", "type": "text", "required": true },
+        { "name": "email", "label": "E-mail", "labelKey": "contact_email", "type": "email" }
       ]
     }
   ],
@@ -38,7 +38,10 @@
       "servers_label": "Servers",
       "col_ip": "IP address",
       "col_cores": "Cores",
-      "contacts_label": "Contacts"
+      "contacts_label": "Contacts",
+      "contact_row": "Contact {index}",
+      "contact_fullname": "Full name",
+      "contact_email": "E-mail"
     }
   }
 }

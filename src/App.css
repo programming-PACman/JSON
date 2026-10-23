@@ -1,8 +1,8 @@
 body { font-family: system-ui, sans-serif; margin: 0; }
-.app { max-width: 1000px; margin: 0 auto; padding: 24px; }
+.app { max-width: 1280px; margin: 0 auto; padding: 24px; }
 .app-header { display: flex; justify-content: space-between; align-items: center; }
 .lang-switch { height: 32px; padding: 0 12px; border: 1px solid #999; background: #fff; cursor: pointer; font-weight: bold; }
-.app-columns { display: grid; grid-template-columns: 1fr 1.2fr; gap: 32px; }
+.app-columns { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 32px; }
 textarea { width: 100%; font-family: monospace; box-sizing: border-box; }
 .field { margin-bottom: 14px; }
 .field label { display: block; margin-bottom: 4px; }
@@ -29,13 +29,14 @@ tr.dragging td { background: #f0f0f0; }
 .mode-switch button.secondary { background: #fff; border: 1px solid #999; }
 
 .builder-meta { margin-bottom: 14px; }
-.builder-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.builder-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; }
 .builder-column { border: 1px solid #ddd; padding: 10px; max-height: 500px; overflow-y: auto; }
 
 .element-row { display: flex; align-items: center; gap: 6px; padding: 6px; border: 1px solid #eee; margin-bottom: 4px; cursor: pointer; }
 .element-row.selected { border-color: #2a5; background: #f0fff4; }
 .element-row.dragging { opacity: 0.4; }
-.element-row-main { flex: 1; }
+.element-row-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.element-row button { flex: none; }
 .element-row-title { font-weight: bold; font-size: 13px; }
 .element-row-type { font-weight: normal; color: #888; font-size: 11px; }
 .element-row-summary { font-size: 11px; color: #666; }
@@ -62,3 +63,26 @@ tr.dragging td { background: #f0f0f0; }
 .dictionary-table th, .dictionary-table td { border-bottom: 1px solid #ddd; padding: 4px; text-align: left; }
 .dictionary-table input { width: 100%; box-sizing: border-box; }
 .dictionary-io { display: flex; gap: 8px; align-items: center; }
+
+/* Редактор вычисляемого значения и «фишки» */
+.computed-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.chip { padding: 2px 8px; font-size: 12px; }
+.chip-op { font-family: monospace; min-width: 28px; }
+.translation-keys summary { cursor: pointer; color: #555; }
+
+.element-editor input:not([type=checkbox]):not([type=radio]), .element-editor select { max-width: 100%; box-sizing: border-box; }
+.field-row .field { min-width: 0; }
+
+/* JSON-инструменты, граф зависимостей, режим предпросмотра */
+.json-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.json-tools-message { color: #555; font-size: 13px; }
+.dependency-view { margin-top: 14px; border-top: 1px solid #ddd; padding-top: 8px; }
+.dependency-view h3 { margin: 0 0 6px; font-size: 15px; }
+.dependency-view ul { list-style: none; margin: 0; padding: 0; }
+.dep-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+.dep-arrow { color: #888; font-size: 12px; font-family: monospace; }
+.dep-chip { padding: 2px 8px; font-size: 12px; }
+.dep-chip.selected { border-color: #2a5; background: #f0fff4; }
+.app-columns.preview-only { grid-template-columns: minmax(0, 1fr); }
+.app-columns.preview-only .preview-column { max-width: 640px; }
+.json-tools .file-button { font-size: 13.333px; padding: 4px 10px; }

@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { resolveText } from '../core/i18n.js';
+import { resolveText, UI_STRINGS } from '../core/i18n.js';
 
 // Повторяющаяся группа полей по шаблону template. error — массив
 // [{ fieldName: "ошибка" }, ...], параллельный rows (validateListRows).
 export default function ListField({ element, value, error, onChange, locale, translations }) {
+  const t = UI_STRINGS[locale] || UI_STRINGS.ru;
   const rows = Array.isArray(value) ? value : [];
+  const rowLabelTemplate = resolveText(element, 'rowLabel', locale, translations) || t.defaultRowLabel;
   const canAdd = element.maxItems === undefined || rows.length < element.maxItems;
   const canRemove = rows.length > (element.minItems ?? 0);
   const [dragIndex, setDragIndex] = useState(null);
@@ -41,11 +43,11 @@ export default function ListField({ element, value, error, onChange, locale, tra
               draggable
               onDragStart={() => setDragIndex(rowIndex)}
               onDragEnd={() => setDragIndex(null)}
-              title="Перетащить для изменения порядка"
+              title={t.dragHint}
             >
               ⠿
             </span>
-            {(element.rowLabel || 'Запись {index}').replace('{index}', rowIndex + 1)}
+            {rowLabelTemplate.replace('{index}', rowIndex + 1)}
           </legend>
           {element.template.map((fieldSpec) => {
             const fLabel = resolveText(fieldSpec, 'label', locale, translations) ?? fieldSpec.label;
@@ -63,10 +65,10 @@ export default function ListField({ element, value, error, onChange, locale, tra
               </div>
             );
           })}
-          <button type="button" onClick={() => removeRow(rowIndex)} disabled={!canRemove}>Удалить запись</button>
+          <button type="button" onClick={() => removeRow(rowIndex)} disabled={!canRemove}>{t.removeRecord}</button>
         </fieldset>
       ))}
-      <button type="button" onClick={addRow} disabled={!canAdd}>+ Добавить</button>
+      <button type="button" onClick={addRow} disabled={!canAdd}>{t.addItem}</button>
     </div>
   );
 }

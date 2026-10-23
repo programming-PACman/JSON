@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { UI_STRINGS } from '../core/i18n.js';
 
 // Список инпутов одного типа с добавлением/удалением/перестановкой строк.
 // Перестановка — через нативный HTML5 drag-n-drop (без сторонних библиотек):
 // перетаскиваем строку за "ручку" (⠿), drop меняет её местами с той, над
 // которой отпустили. error — массив ["ошибка"|null, ...], параллельный items.
-export default function ArrayField({ element, value, error, onChange }) {
+export default function ArrayField({ element, value, error, onChange, locale }) {
+  const t = UI_STRINGS[locale] || UI_STRINGS.ru;
   const items = Array.isArray(value) ? value : [];
   const inputType = element.itemType === 'number' ? 'number' : element.itemType === 'email' ? 'email' : element.itemType === 'date' ? 'date' : 'text';
   const canAdd = element.maxItems === undefined || items.length < element.maxItems;
@@ -42,7 +44,7 @@ export default function ArrayField({ element, value, error, onChange }) {
             draggable
             onDragStart={() => setDragIndex(i)}
             onDragEnd={() => setDragIndex(null)}
-            title="Перетащить для изменения порядка"
+            title={t.dragHint}
           >
             ⠿
           </span>
@@ -54,10 +56,10 @@ export default function ArrayField({ element, value, error, onChange }) {
             />
             {error?.[i] && <p className="field-error">{error[i]}</p>}
           </div>
-          <button type="button" onClick={() => remove(i)} disabled={!canRemove}>✕</button>
+          <button type="button" title={t.removeItem} aria-label={t.removeItem} onClick={() => remove(i)} disabled={!canRemove}>✕</button>
         </div>
       ))}
-      <button type="button" onClick={add} disabled={!canAdd}>+ Добавить</button>
+      <button type="button" onClick={add} disabled={!canAdd}>{t.addItem}</button>
     </div>
   );
 }

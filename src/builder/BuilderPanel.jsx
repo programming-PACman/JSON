@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import ElementList from './ElementList.jsx';
 import ElementEditor from './ElementEditor.jsx';
-import { addElement, duplicateElement, deleteElement, moveElement, updateElement, renameElement, selectionAfterMove } from './builderUtils.js';
+import DependencyView from './DependencyView.jsx';
+import { addElement, duplicateElement, deleteElement, moveElement, updateElement, renameElement, selectionAfterMove, dependencySources } from './builderUtils.js';
 
 // Конструктор редактирует spec как обычный JS-объект (не текст!) — это и есть
 // принцип "состояние конструктора есть спецификация", JSON получается из него
 // через JSON.stringify только при передаче наружу (onChange).
-export default function BuilderPanel({ spec, errors, onChange }) {
+export default function BuilderPanel({ spec, errors, onChange, dictionaryKeys = [] }) {
   const [selected, setSelected] = useState(spec.elements.length > 0 ? 0 : null);
 
   const handleAdd = (type) => {
@@ -31,7 +32,7 @@ export default function BuilderPanel({ spec, errors, onChange }) {
   const handleRename = (index, newName) => onChange(renameElement(spec, index, newName));
 
   const selectedElement = selected !== null ? spec.elements[selected] : null;
-  const otherElements = selected !== null ? spec.elements.filter((_, i) => i !== selected) : spec.elements;
+  const sources = selected !== null ? dependencySources(spec, selected) : { scalar: [], arrays: [] };
 
   return (
     <div className="builder-panel">
@@ -59,7 +60,8 @@ export default function BuilderPanel({ spec, errors, onChange }) {
           {selectedElement ? (
             <ElementEditor
               element={selectedElement}
-              otherElements={otherElements}
+              sources={sources}
+              dictionaryKeys={dictionaryKeys}
               onChange={(el) => handleElementChange(selected, el)}
               onRename={(name) => handleRename(selected, name)}
             />
@@ -68,6 +70,8 @@ export default function BuilderPanel({ spec, errors, onChange }) {
           )}
         </div>
       </div>
+
+      <DependencyView spec={spec} selectedIndex={selected} onSelect={setSelected} />
     </div>
   );
 }

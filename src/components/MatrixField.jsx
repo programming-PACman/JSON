@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { resolveText } from '../core/i18n.js';
+import { resolveText, UI_STRINGS } from '../core/i18n.js';
 
 // Таблица со столбцами заданных типов. Перестановка строк — drag-n-drop
 // за ручку (⠿) в первой колонке, тем же принципом, что и ArrayField.
 export default function MatrixField({ element, value, error, onChange, locale, translations }) {
+  const t = UI_STRINGS[locale] || UI_STRINGS.ru;
   const rows = Array.isArray(value) ? value : [];
   const canAdd = element.maxItems === undefined || rows.length < element.maxItems;
   const canRemove = rows.length > (element.minItems ?? 0);
@@ -52,7 +53,7 @@ export default function MatrixField({ element, value, error, onChange, locale, t
                   draggable
                   onDragStart={() => setDragIndex(rowIndex)}
                   onDragEnd={() => setDragIndex(null)}
-                  title="Перетащить для изменения порядка"
+                  title={t.dragHint}
                 >
                   ⠿
                 </span>
@@ -67,12 +68,12 @@ export default function MatrixField({ element, value, error, onChange, locale, t
                   {error?.[rowIndex]?.[col.name] && <p className="field-error">{error[rowIndex][col.name]}</p>}
                 </td>
               ))}
-              <td><button type="button" onClick={() => removeRow(rowIndex)} disabled={!canRemove}>✕</button></td>
+              <td><button type="button" title={t.removeItem} aria-label={t.removeItem} onClick={() => removeRow(rowIndex)} disabled={!canRemove}>✕</button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button type="button" onClick={addRow} disabled={!canAdd}>+ Добавить строку</button>
+      <button type="button" onClick={addRow} disabled={!canAdd}>{t.addRow}</button>
     </div>
   );
 }

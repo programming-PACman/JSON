@@ -42,7 +42,7 @@ function Field({ element, value, error, locale, translations, options, onChange 
       <div className="field">
         <span>{label}{element.required && <span className="required">*</span>}</span>
         {hint}
-        <ArrayField element={element} value={value} error={error} onChange={onChange} />
+        <ArrayField element={element} value={value} error={error} onChange={onChange} locale={locale} />
       </div>
     );
   }
@@ -74,7 +74,7 @@ function Field({ element, value, error, locale, translations, options, onChange 
         {hint}
         {(options || []).map(resolveOption).map((opt) => (
           <label key={opt.value} className="radio-option">
-            <input type="radio" name={element.name} checked={value === opt.value} onChange={() => onChange(opt.value)} />
+            <input type="radio" name={element.name} checked={value === opt.value} disabled={element.disabled} onChange={() => onChange(opt.value)} />
             {opt.label}
           </label>
         ))}
@@ -87,7 +87,7 @@ function Field({ element, value, error, locale, translations, options, onChange 
     return (
       <div className="field field-inline">
         <label>
-          <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
+          <input type="checkbox" checked={!!value} disabled={element.disabled} onChange={(e) => onChange(e.target.checked)} />
           {' '}{label}
         </label>
         {hint}
@@ -99,7 +99,7 @@ function Field({ element, value, error, locale, translations, options, onChange 
   let input;
   if (element.type === 'select') {
     input = (
-      <select id={element.name} value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
+      <select id={element.name} value={value ?? ''} disabled={element.disabled} onChange={(e) => onChange(e.target.value)}>
         <option value="" disabled>{t.selectPlaceholder}</option>
         {(options || []).map(resolveOption).map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>

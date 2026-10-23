@@ -6,24 +6,12 @@ import {
   hasAnyArrayError, hasAnyMatrixError, hasAnyListError,
 } from './core/validateValue.js';
 import { UI_STRINGS, resolveText } from './core/i18n.js';
-import { buildDependencyGraph, propagateChange } from './core/bindingEngine.js';
+import { buildDependencyGraph, propagateChange, computeInitialState } from './core/bindingEngine.js';
 import BuilderPanel from './builder/BuilderPanel.jsx';
 import DictionaryPanel from './builder/DictionaryPanel.jsx';
-import { loadDictionary, saveDictionary, withSharedDictionary } from './core/dictionary.js';
-
-function computeInitialState(elements, graph) {
-  let values = {};
-  elements.forEach((el) => { if (el.default !== undefined) values[el.name] = el.default; });
-  let dynamicOptions = {}, visibility = {};
-  Object.keys(graph.dependents).forEach((sourceName) => {
-    if (values[sourceName] === undefined) return;
-    const r = propagateChange(sourceName, graph, values);
-    values = r.values;
-    dynamicOptions = { ...dynamicOptions, ...r.dynamicOptions };
-    visibility = { ...visibility, ...r.visibility };
-  });
-  return { values, dynamicOptions, visibility };
-}
+import JsonTools from './builder/JsonTools.jsx';
+import SpecInputPanel from './components/SpecInputPanel.jsx';
+import { loadDictionary, saveDictionary, withSharedDictionary, allKeys } from './core/dictionary.js';
 
 function validateElement(el, value, locale, label) {
   if (el.type === 'array') return validateArrayItems(el, value, locale);
@@ -51,7 +39,7 @@ export default function App() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [collected, setCollected] = useState(null);
   const [checkedOk, setCheckedOk] = useState(false);
-  const [mode, setMode] = useState('json'); // 'json' | 'builder' | 'dictionary'
+  const [mode, setMode] = useState('json'); // 'json' | 'builder' | 'preview' | 'dictionary'
   const [dictionary, setDictionary] = useState(() => loadDictionary());
   const [builderSpec, setBuilderSpec] = useState({ title: 'Новая форма', elements: [] });
 
@@ -68,7 +56,7 @@ export default function App() {
     try {
       parsed = JSON.parse(raw);
     } catch (e) {
-      setSpecErrors([{ path: '$', message: `Некорректный JSON: ${e.message}` }]);
+      setSpecErrors([{ path: '$', message: UI_STRINGS[locale].invalidJson(e.message) }]);
       setSpec(null);
       return;
     }
@@ -114,6 +102,20 @@ export default function App() {
     setMode('builder');
   };
 
+  // Импорт готовой спецификации из файла: сразу в конструктор (чтобы продолжить
+  // визуальное редактирование) и через обычный конвейер validateSpec → превью.
+  // Спецификация с ошибками тоже загружается — ошибки видны в списке и значках,
+  // и их можно исправить визуально. Не-спецификация (нет массива elements) отклоняется.
+  const handleImport = (raw) => {
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch { return false; }
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.elements)) return false;
+    setBuilderSpec(parsed);
+    setText(raw);
+    handleLoadFromText(raw);
+    return true;
+  };
+
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -130,7 +132,7 @@ export default function App() {
     try {
       parsed = JSON.parse(text);
     } catch (e) {
-      setSpecErrors([{ path: '$', message: `Некорректный JSON: ${e.message}` }]);
+      setSpecErrors([{ path: '$', message: UI_STRINGS[locale].invalidJson(e.message) }]);
       setCheckedOk(false);
       return;
     }
@@ -183,34 +185,28 @@ export default function App() {
         </button>
       </div>
 
-      <div className="app-columns">
+      <div className={`app-columns${mode === 'preview' ? ' preview-only' : ''}`}>
         <section>
           <div className="mode-switch">
             <button type="button" className={mode === 'json' ? 'active' : 'secondary'} onClick={() => setMode('json')}>JSON</button>
-            <button type="button" className={mode === 'builder' ? 'active' : 'secondary'} onClick={switchToBuilder}>Конструктор</button>
+            <button type="button" className={mode === 'builder' ? 'active' : 'secondary'} onClick={switchToBuilder}>{t.builderTab}</button>
+            <button type="button" className={mode === 'preview' ? 'active' : 'secondary'} onClick={() => setMode('preview')}>{t.previewTab}</button>
             <button type="button" className={mode === 'dictionary' ? 'active' : 'secondary'} onClick={() => setMode('dictionary')}>{t.dictTab}</button>
           </div>
 
-          {mode === 'json' ? (
+          {mode === 'json' && (
             <>
-              <label htmlFor="spec-text">{t.specLabel}</label>
-              <textarea
-                id="spec-text"
-                rows={14}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder='{"title": "...", "elements": [...]}'
-              />
-              <button type="button" onClick={handleLoad}>{t.loadButton}</button>
-              <button type="button" onClick={handleCheck}>{t.checkButton}</button>
-              <label className="file-button">
-                {t.fileButton}
-                <input type="file" accept=".json" onChange={handleFile} hidden />
-              </label>
+              <SpecInputPanel text={text} onTextChange={setText} onLoad={handleLoad} onCheck={handleCheck} onFile={handleFile} locale={locale} />
+              <JsonTools getText={() => text} onImport={handleImport} locale={locale} filename={spec?.title} showImport={false} />
             </>
-          ) : mode === 'builder' ? (
-            <BuilderPanel spec={builderSpec} errors={specErrors} onChange={handleBuilderChange} />
-          ) : (
+          )}
+          {mode === 'builder' && (
+            <>
+              <JsonTools getText={() => JSON.stringify(builderSpec, null, 2)} onImport={handleImport} locale={locale} filename={builderSpec.title} />
+              <BuilderPanel spec={builderSpec} errors={specErrors} onChange={handleBuilderChange} dictionaryKeys={allKeys(dictionary)} />
+            </>
+          )}
+          {mode === 'dictionary' && (
             <DictionaryPanel dictionary={dictionary} spec={spec} locale={locale} onChange={setDictionary} />
           )}
 
@@ -226,7 +222,7 @@ export default function App() {
           )}
         </section>
 
-        <section>
+        <section className="preview-column">
           {spec && (
             <>
               <h2>{resolveText(spec, 'title', locale, effectiveSpec.translations) ?? spec.title}</h2>
