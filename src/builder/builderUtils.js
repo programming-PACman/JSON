@@ -382,3 +382,15 @@ export function fileSafeName(title, fallback = 'form') {
   if (!cleaned) return fallback;
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
+
+// Какие введённые в предпросмотре значения сохранить после правки спецификации:
+// только у полей, которые остались и не сменили тип (смена типа делает старое значение бессмысленным).
+export function carryOverValues(oldElements, newElements, values) {
+  const oldTypes = {};
+  (oldElements || []).forEach((el) => { oldTypes[el.name] = el.type; });
+  const kept = {};
+  (newElements || []).forEach((el) => {
+    if (oldTypes[el.name] === el.type && values && Object.prototype.hasOwnProperty.call(values, el.name)) kept[el.name] = values[el.name];
+  });
+  return kept;
+}

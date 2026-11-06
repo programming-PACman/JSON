@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import FormRenderer from './components/FormRenderer.jsx';
 import { validateSpec } from './core/validateSpec.js';
 import {
@@ -11,7 +11,10 @@ import BuilderPanel from './builder/BuilderPanel.jsx';
 import DictionaryPanel from './builder/DictionaryPanel.jsx';
 import JsonTools from './builder/JsonTools.jsx';
 import SpecInputPanel from './components/SpecInputPanel.jsx';
-import { loadDictionary, saveDictionary, withSharedDictionary, allKeys } from './core/dictionary.js';
+import ServerTools from './builder/ServerTools.jsx';
+import { useSharedDictionary } from './builder/useSharedDictionary.js';
+import { carryOverValues } from './builder/builderUtils.js';
+import { withSharedDictionary, allKeys } from './core/dictionary.js';
 
 function validateElement(el, value, locale, label) {
   if (el.type === 'array') return validateArrayItems(el, value, locale);
@@ -40,17 +43,16 @@ export default function App() {
   const [collected, setCollected] = useState(null);
   const [checkedOk, setCheckedOk] = useState(false);
   const [mode, setMode] = useState('json'); // 'json' | 'builder' | 'preview' | 'dictionary'
-  const [dictionary, setDictionary] = useState(() => loadDictionary());
+  const { dictionary, setDictionary, status: dictStatus, refresh: refreshDictionary } = useSharedDictionary();
   const [builderSpec, setBuilderSpec] = useState({ title: 'Новая форма', elements: [] });
 
   const t = UI_STRINGS[locale];
 
-  useEffect(() => { saveDictionary(dictionary); }, [dictionary]);
-
   // spec с переводами, слитыми с общим словарём (локальные translations приоритетнее)
   const effectiveSpec = withSharedDictionary(spec, dictionary);
 
-  const handleLoadFromText = (raw) => {
+  // keepValues: при правке в конструкторе сохраняем то, что пользователь уже ввёл в предпросмотре
+  const handleLoadFromText = (raw, { keepValues = false } = {}) => {
     setCheckedOk(false);
     let parsed;
     try {
@@ -67,7 +69,8 @@ export default function App() {
 
     if (errors.length === 0) {
       const newGraph = buildDependencyGraph(parsed.elements);
-      const initial = computeInitialState(parsed.elements, newGraph);
+      const seed = keepValues && spec ? carryOverValues(spec.elements, parsed.elements, values) : undefined;
+      const initial = computeInitialState(parsed.elements, newGraph, seed);
       setSpec(parsed);
       setGraph(newGraph);
       setValues(initial.values);
@@ -89,7 +92,7 @@ export default function App() {
     setBuilderSpec(newSpec);
     const json = JSON.stringify(newSpec, null, 2);
     setText(json);
-    handleLoadFromText(json);
+    handleLoadFromText(json, { keepValues: true });
   };
 
   const switchToBuilder = () => {
@@ -198,16 +201,18 @@ export default function App() {
             <>
               <SpecInputPanel text={text} onTextChange={setText} onLoad={handleLoad} onCheck={handleCheck} onFile={handleFile} locale={locale} />
               <JsonTools getText={() => text} onImport={handleImport} locale={locale} filename={spec?.title} showImport={false} />
+              <ServerTools getText={() => text} onImport={handleImport} locale={locale} />
             </>
           )}
           {mode === 'builder' && (
             <>
               <JsonTools getText={() => JSON.stringify(builderSpec, null, 2)} onImport={handleImport} locale={locale} filename={builderSpec.title} />
+              <ServerTools getText={() => JSON.stringify(builderSpec, null, 2)} onImport={handleImport} locale={locale} />
               <BuilderPanel spec={builderSpec} errors={specErrors} onChange={handleBuilderChange} dictionaryKeys={allKeys(dictionary)} />
             </>
           )}
           {mode === 'dictionary' && (
-            <DictionaryPanel dictionary={dictionary} spec={spec} locale={locale} onChange={setDictionary} />
+            <DictionaryPanel dictionary={dictionary} spec={spec} locale={locale} onChange={setDictionary} status={dictStatus} onRefresh={refreshDictionary} />
           )}
 
           {checkedOk && specErrors.length === 0 && <p className="check-ok">{t.checkOk}</p>}

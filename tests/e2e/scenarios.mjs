@@ -1,4 +1,4 @@
-// Сценарии e2e. Каждый получает { page, url, specText, check }.
+// Сценарии e2e. Каждый получает { page, url, specText, browser, apiState, check }.
 const loadSpec = async (page, specText) => {
   await page.locator('#spec-text').fill(specText);
   await page.getByRole('button', { name: 'Загрузить спецификацию' }).click();
@@ -13,6 +13,25 @@ const addElement = async (page, type) => {
   await page.locator('.element-list-add button').click();
 };
 const openBuilder = (page) => page.getByRole('button', { name: 'Конструктор' }).click();
+
+// --- помощники для общего словаря / сервера ---
+const synced = (page) => page.waitForFunction(() => document.querySelector('[data-sync]')?.dataset.sync === 'synced', null, { timeout: 8000 });
+const serverDict = (page) => page.evaluate(() => fetch('/api/dictionary').then((r) => r.json()));
+const openDict = (page) => page.getByRole('button', { name: 'Словарь' }).click();
+const addEntry = async (page, key, ru, en) => {
+  const inputs = page.locator('.dictionary-add input');
+  await inputs.nth(0).fill(key); await inputs.nth(1).fill(ru); await inputs.nth(2).fill(en);
+  await page.getByRole('button', { name: 'Добавить', exact: true }).click();
+};
+const newPage = async (browser, url) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(url);
+  return { context, page };
+};
+
+// Сценарии, где сетевые ошибки в консоли браузера ожидаемы (сервер «упал» или отклонил запрос)
+export const expectNetworkErrors = new Set(['Сервер: офлайн-режим и повторная отправка', 'Сервер: некорректную спецификацию отклоняет', 'Сервер недоступен: сохранение формы сообщает об ошибке']);
 
 export default {
   async 'JSON → форма'({ page, specText, check }) {
@@ -270,5 +289,133 @@ export default {
     await page.locator('.element-row').first().waitFor();
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
     check('после перезагрузки и импорта JSON тот же', (await page.locator('#spec-text').inputValue()) === before);
+  },
+  async 'Сервер: словарь сохраняется на сервере'({ page, check }) {
+    await openDict(page);
+    await synced(page);
+    await addEntry(page, 'srv_key', 'Сервер', 'Server');
+    await synced(page);
+    const d = await serverDict(page);
+    check('запись есть на сервере (ru и en)', d.ru.srv_key === 'Сервер' && d.en.srv_key === 'Server');
+    await page.locator('.dictionary-table tr', { hasText: 'srv_key' }).locator('input').nth(1).fill('Server!');
+    await synced(page);
+    check('правка перевода дошла до сервера', (await serverDict(page)).en.srv_key === 'Server!');
+    await page.getByRole('button', { name: 'Удалить' }).first().click();
+    await synced(page);
+    check('удаление дошло до сервера', (await serverDict(page)).ru.srv_key === undefined);
+  },
+
+  async 'Сервер: словарь общий для двух пользователей'({ page, url, browser, check }) {
+    await openDict(page); await synced(page);
+    const b = await newPage(browser, url);
+    await openDict(b.page); await synced(b.page);
+    await addEntry(page, 'from_a', 'От А', 'From A'); await synced(page);
+    check('до обновления B ещё не видит запись', await b.page.locator('.dictionary-table code', { hasText: 'from_a' }).count() === 0);
+    await b.page.getByRole('button', { name: 'Обновить с сервера' }).click();
+    await b.page.locator('.dictionary-table code', { hasText: 'from_a' }).waitFor();
+    check('после «Обновить с сервера» B видит запись A', await b.page.locator('.dictionary-table code', { hasText: 'from_a' }).count() === 1);
+    await addEntry(b.page, 'from_b', 'От Б', 'From B'); await synced(b.page);
+    await page.getByRole('button', { name: 'Обновить с сервера' }).click();
+    await page.locator('.dictionary-table code', { hasText: 'from_b' }).waitFor();
+    const keys = await page.locator('.dictionary-table code').allInnerTexts();
+    check('у A обе записи (чужая не затёрла свою и наоборот)', keys.includes('from_a') && keys.includes('from_b'));
+    await b.context.close();
+  },
+
+  async 'Сервер: правка поверх чужих изменений не затирает их'({ page, url, browser, check }) {
+    await openDict(page); await synced(page);
+    await addEntry(page, 'shared_one', 'Один', 'One'); await synced(page);
+    const b = await newPage(browser, url);
+    await openDict(b.page); await synced(b.page);
+    // A добавляет ключ, B (не обновляясь) правит другой — оба должны остаться на сервере
+    await addEntry(page, 'a_new', 'А', 'A'); await synced(page);
+    await b.page.locator('.dictionary-table tr', { hasText: 'shared_one' }).locator('input').nth(1).fill('One (edited by B)');
+    await synced(b.page);
+    const d = await serverDict(page);
+    check('на сервере есть ключ A и правка B', d.ru.a_new === 'А' && d.en.shared_one === 'One (edited by B)');
+    const keys = await b.page.locator('.dictionary-table code').allInnerTexts();
+    check('B после сохранения сразу видит ключ A', keys.includes('a_new'));
+    await b.context.close();
+  },
+
+  async 'Сервер: офлайн-режим и повторная отправка'({ page, apiState, check }) {
+    await openDict(page); await synced(page);
+    apiState.offline = true;
+    await addEntry(page, 'offline_key', 'Офлайн', 'Offline');
+    await page.waitForFunction(() => document.querySelector('[data-sync]')?.dataset.sync === 'offline', null, { timeout: 8000 });
+    check('статус «сервер недоступен»', (await page.locator('.dictionary-sync').innerText()).includes('Сервер недоступен'));
+    check('запись осталась в таблице', await page.locator('.dictionary-table code', { hasText: 'offline_key' }).count() === 1);
+    await page.reload(); await openDict(page);
+    check('после перезагрузки без сервера запись есть (localStorage)', await page.locator('.dictionary-table code', { hasText: 'offline_key' }).count() === 1);
+    apiState.offline = false;
+    await page.getByRole('button', { name: 'Обновить с сервера' }).click();
+    await synced(page);
+    check('связь вернулась — запись ушла на сервер', (await serverDict(page)).ru.offline_key === 'Офлайн');
+  },
+
+  async 'Сервер: локальный словарь переносится на пустой сервер'({ page, check }) {
+    await openDict(page); await synced(page); // дождаться первого подключения, иначе оно перезапишет подставленные данные
+    await page.evaluate(() => localStorage.setItem('jgb.sharedDictionary', JSON.stringify({ ru: { old_local: 'Старое' }, en: { old_local: 'Old' } })));
+    await page.reload(); await openDict(page); await synced(page);
+    check('локальная запись видна', await page.locator('.dictionary-table code', { hasText: 'old_local' }).count() === 1);
+    await synced(page);
+    check('и поднята на сервер', (await serverDict(page)).en.old_local === 'Old');
+  },
+
+  async 'Словарь: переименование ключа'({ page, check }) {
+    await openDict(page); await synced(page);
+    await addEntry(page, 'old_name', 'Текст', 'Text'); await synced(page);
+    await page.getByRole('button', { name: 'Переименовать old_name' }).click();
+    const input = page.locator('.dictionary-table input[aria-label=Переименовать]');
+    await input.fill('1bad'); await input.press('Enter');
+    check('некорректное имя отклонено, ключ прежний', await page.locator('.dictionary-error').count() === 1 && await page.locator('.dictionary-table input[aria-label=Переименовать]').count() === 1);
+    await input.fill('new_name'); await input.press('Enter');
+    await synced(page);
+    const keys = await page.locator('.dictionary-table code').allInnerTexts();
+    check('в таблице новый ключ, старого нет', keys.includes('new_name') && !keys.includes('old_name'));
+    const d = await serverDict(page);
+    check('на сервере переименовано, переводы сохранены', d.ru.new_name === 'Текст' && d.en.new_name === 'Text' && d.ru.old_name === undefined);
+  },
+
+  async 'Сервер: сохранить форму и открыть из списка'({ page, url, browser, specText, check }) {
+    await loadSpec(page, specText);
+    await page.getByRole('button', { name: 'Сохранить на сервер' }).click();
+    await page.locator('.server-ok').waitFor();
+    const msg = await page.locator('.server-ok').innerText();
+    const id = (msg.match(/[a-f0-9]{12}/) || [])[0];
+    check('сервер вернул id из 12 hex-символов', Boolean(id));
+    check('кнопка теперь «Обновить на сервере»', await page.getByRole('button', { name: 'Обновить на сервере' }).count() === 1);
+    const b = await newPage(browser, url);
+    await b.page.locator('.server-tools select').selectOption(id);
+    await b.page.locator('.form-renderer').waitFor();
+    check('другой пользователь открыл форму по списку', await b.page.getByText('Имя пользователя').count() > 0);
+    await b.context.close();
+  },
+
+  async 'Сервер: некорректную спецификацию отклоняет'({ page, check }) {
+    await page.locator('#spec-text').fill(JSON.stringify({ title: 'X', elements: [{ name: 'a', label: 'A', type: 'nope' }] }));
+    await page.getByRole('button', { name: 'Сохранить на сервер' }).click();
+    await page.locator('.server-error').waitFor();
+    check('показано сообщение об отклонении', (await page.locator('.server-error').innerText()).includes('отклонил'));
+    check('в списке на сервере ничего не появилось', (await page.evaluate(() => fetch('/api/specs').then((r) => r.json()))).length === 0);
+  },
+
+  async 'Сервер недоступен: сохранение формы сообщает об ошибке'({ page, apiState, specText, check }) {
+    await loadSpec(page, specText);
+    apiState.offline = true;
+    await page.getByRole('button', { name: 'Сохранить на сервер' }).click();
+    await page.locator('.server-error').waitFor();
+    check('сообщение «Сервер недоступен»', (await page.locator('.server-error').innerText()).includes('Сервер недоступен'));
+    check('форма при этом продолжает работать', await page.getByText('Имя пользователя').count() > 0);
+  },
+
+  async 'Конструктор: значения предпросмотра не сбрасываются при правках'({ page, check }) {
+    await openBuilder(page); await addElement(page, 'text');
+    const input = page.locator('.form-renderer input[type=text]');
+    await input.fill('Иван');
+    await addElement(page, 'checkbox');
+    check('после добавления поля введённое значение осталось', (await page.locator('.form-renderer input[type=text]').first().inputValue()) === 'Иван');
+    await editorField(page, 'Описание (description)').locator('input').fill('подсказка');
+    check('и после правки свойства тоже', (await page.locator('.form-renderer input[type=text]').first().inputValue()) === 'Иван');
   },
 };

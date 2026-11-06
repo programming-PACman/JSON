@@ -86,3 +86,13 @@ tr.dragging td { background: #f0f0f0; }
 .app-columns.preview-only { grid-template-columns: minmax(0, 1fr); }
 .app-columns.preview-only .preview-column { max-width: 640px; }
 .json-tools .file-button { font-size: 13.333px; padding: 4px 10px; }
+
+/* ── синхронизация словаря и сервер ── */
+.dictionary-sync { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 14px; margin: 8px 0; }
+.dictionary-sync.sync-synced { color: #1b7a3a; }
+.dictionary-sync.sync-offline, .dictionary-sync.sync-error { color: #b3261e; }
+.dictionary-rename { margin-left: 6px; padding: 0 6px; }
+.server-tools { margin: 8px 0; }
+.server-tools-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.server-ok { color: #1b7a3a; font-size: 14px; margin: 6px 0 0; }
+.server-error { color: #b3261e; font-size: 14px; margin: 6px 0 0; }

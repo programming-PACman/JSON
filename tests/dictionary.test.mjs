@@ -1,7 +1,7 @@
 import {
   emptyDictionary, mergeTranslations, withSharedDictionary, setEntry, removeKey, renameKey,
   allKeys, collectSpecKeys, findMissingKeys, normalizeDictionary, parseDictionary,
-  serializeDictionary, mergeDictionaries, loadDictionary, saveDictionary,
+  serializeDictionary, mergeDictionaries, loadDictionary, saveDictionary, diffDictionary, applyOps,
 } from '../src/core/dictionary.js';
 import { resolveText } from '../src/core/i18n.js';
 import { readFileSync } from 'node:fs';
@@ -58,6 +58,25 @@ check('save/load через storage', saveDictionary(d2, fake) && loadDictionary
 const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } };
 check('сломанный storage: load → пустой словарь, save → false', loadDictionary(broken).ru && saveDictionary(d2, broken) === false);
 check('без storage вообще не падает', loadDictionary(undefined).ru !== undefined);
+
+// diffDictionary: операции над записями для синхронизации с сервером
+const A = { ru: { a: 'А', b: 'Б' }, en: { a: 'A' } };
+check('diff: одинаковые → нет операций', diffDictionary(A, JSON.parse(JSON.stringify(A))).length === 0);
+const added = diffDictionary(A, setEntry(A, 'c', 'ru', 'Ц'));
+check('diff: новый ключ → put с набором переводов', added.length === 1 && added[0].type === 'put' && added[0].key === 'c' && added[0].texts.ru === 'Ц');
+const edited = diffDictionary(A, setEntry(A, 'a', 'en', 'AA'));
+check('diff: правка → put со ВСЕМИ языками ключа', edited.length === 1 && edited[0].texts.ru === 'А' && edited[0].texts.en === 'AA');
+const removed = diffDictionary(A, removeKey(A, 'b'));
+check('diff: удаление ключа → delete', removed.length === 1 && removed[0].type === 'delete' && removed[0].key === 'b');
+check('diff: пустой перевод — это правка, а не удаление ключа', diffDictionary(A, setEntry(A, 'a', 'en', ''))[0]?.type === 'put');
+check('diff: из пустого словаря', diffDictionary(emptyDictionary(), A).length === 2);
+// applyOps: локальные правки поверх свежей версии с сервера
+const serverNow = { ru: { a: 'А', z: 'Я' }, en: { a: 'A', z: 'Z' } }; // чужой ключ z появился на сервере
+const rebased = applyOps(serverNow, diffDictionary(A, setEntry(A, 'c', 'ru', 'Ц')));
+check('applyOps: чужие ключи сохраняются, наш добавлен', rebased.ru.z === 'Я' && rebased.ru.c === 'Ц' && rebased.ru.b === undefined);
+check('applyOps: delete убирает ключ во всех языках', applyOps(serverNow, [{ type: 'delete', key: 'a' }]).en.a === undefined);
+check('applyOps не мутирует исходный словарь', serverNow.ru.a === 'А' && serverNow.en.z === 'Z');
+check('diff + apply: A → B даёт B', JSON.stringify(applyOps(A, diffDictionary(A, setEntry(removeKey(A, 'b'), 'q', 'en', 'Q')))) === JSON.stringify(setEntry(removeKey(A, 'b'), 'q', 'en', 'Q')));
 
 console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED');
 process.exit(failed ? 1 : 0);

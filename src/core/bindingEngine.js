@@ -85,9 +85,15 @@ function emptyScope(graph) {
 // Стартовое состояние формы: default'ы + первичный прогон ВСЕХ зависимостей
 // (а не только тех, чей источник уже имеет значение) — иначе поля с visibleWhen
 // от пустого источника оказались бы видимыми до первого действия пользователя.
-export function computeInitialState(elements, graph) {
+// seed (необязательно) — значения, которые нужно сохранить вместо default: так предпросмотр
+// не теряет введённое пользователем, когда спецификацию правят в конструкторе. Вычисляемые
+// поля и видимость всё равно пересчитываются ниже, поэтому устаревшие значения не «залипают».
+export function computeInitialState(elements, graph, seed) {
   let values = {};
-  elements.forEach((el) => { if (el.default !== undefined) values[el.name] = el.default; });
+  elements.forEach((el) => {
+    if (seed && Object.prototype.hasOwnProperty.call(seed, el.name)) values[el.name] = seed[el.name];
+    else if (el.default !== undefined) values[el.name] = el.default;
+  });
   let dynamicOptions = {};
   let visibility = {};
   Object.keys(graph.dependents).forEach((sourceName) => {

@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { UI_STRINGS } from '../core/i18n.js';
 import {
-  LOCALES, BASE_LOCALE, allKeys, setEntry, removeKey, isValidKey, findMissingKeys,
-  parseDictionary, serializeDictionary, mergeDictionaries,
+  LOCALES, BASE_LOCALE, allKeys, setEntry, removeKey, renameKey, isValidKey, findMissingKeys,
+  collectSpecKeys, parseDictionary, serializeDictionary, mergeDictionaries,
 } from '../core/dictionary.js';
 
 // Форма пополнения общего словаря + таблица существующих записей.
 // spec нужен только для подсказки «каких ключей формы не хватает».
-export default function DictionaryPanel({ dictionary, spec, locale, onChange }) {
+export default function DictionaryPanel({ dictionary, spec, locale, onChange, status, onRefresh }) {
   const t = UI_STRINGS[locale];
   const [draftKey, setDraftKey] = useState('');
   const [draftTexts, setDraftTexts] = useState({});
   const [message, setMessage] = useState('');
+  const [renaming, setRenaming] = useState(null); // { from, to }
 
   const keys = allKeys(dictionary);
   const missing = spec ? findMissingKeys(spec, dictionary, locale) : [];
@@ -27,6 +28,25 @@ export default function DictionaryPanel({ dictionary, spec, locale, onChange }) 
     setDraftTexts({});
     setMessage('');
   };
+
+  const commitRename = () => {
+    if (!renaming) return;
+    const { from, to } = renaming;
+    if (to === from) { setRenaming(null); return; }
+    const result = renameKey(dictionary, from, to);
+    if (result.error) { setMessage(result.error === 'duplicateKey' ? t.dictDuplicateKey : t.dictInvalidKey); return; }
+    onChange(result.dict);
+    setMessage(spec && collectSpecKeys(spec).includes(from) ? t.dictRenameWarn(from) : '');
+    setRenaming(null);
+  };
+
+  const statusText = !status ? '' : {
+    connecting: t.dictSyncConnecting,
+    synced: t.dictSyncSynced,
+    saving: t.dictSyncSaving,
+    offline: t.dictSyncOffline,
+    error: t.dictSyncError(status.message),
+  }[status.state];
 
   const handleExport = () => {
     const blob = new Blob([serializeDictionary(dictionary)], { type: 'application/json' });
@@ -55,6 +75,12 @@ export default function DictionaryPanel({ dictionary, spec, locale, onChange }) 
   return (
     <div className="dictionary-panel">
       <p className="dictionary-hint">{t.dictHint}</p>
+      {status && (
+        <p className={`dictionary-sync sync-${status.state}`} data-sync={status.state}>
+          {statusText}
+          {onRefresh && <button type="button" className="secondary" onClick={onRefresh}>{t.dictRefresh}</button>}
+        </p>
+      )}
 
       {spec && (
         <p className={missing.length ? 'dictionary-missing' : 'dictionary-ok'}>
@@ -99,7 +125,24 @@ export default function DictionaryPanel({ dictionary, spec, locale, onChange }) 
           <tbody>
             {keys.map((k) => (
               <tr key={k}>
-                <td><code>{k}</code></td>
+                <td>
+                  {renaming?.from === k ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      aria-label={t.dictRename}
+                      value={renaming.to}
+                      onChange={(e) => setRenaming({ from: k, to: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(null); }}
+                      onBlur={commitRename}
+                    />
+                  ) : (
+                    <>
+                      <code>{k}</code>
+                      <button type="button" className="secondary dictionary-rename" title={t.dictRename} aria-label={`${t.dictRename} ${k}`} onClick={() => setRenaming({ from: k, to: k })}>✎</button>
+                    </>
+                  )}
+                </td>
                 {LOCALES.map((l) => (
                   <td key={l}>
                     <input

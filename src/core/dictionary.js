@@ -140,6 +140,47 @@ export function mergeDictionaries(current, incoming) {
   return mergeTranslations(current, incoming);
 }
 
+// Разница между двумя словарями в виде операций над ЗАПИСЯМИ (ключами) — по ним клиент
+// обновляет общий словарь на сервере, не перезаписывая чужие правки целиком:
+//   { type: 'put', key, texts: { ru, en } } — ключ добавлен/изменён (texts — полный набор его переводов)
+//   { type: 'delete', key }                  — ключ удалён целиком
+export function diffDictionary(prev, next) {
+  const ops = [];
+  const prevKeys = new Set(allKeys(prev));
+  const nextKeys = allKeys(next);
+  nextKeys.forEach((key) => {
+    const texts = {};
+    Object.keys(next || {}).forEach((l) => { if (next[l]?.[key] !== undefined) texts[l] = next[l][key]; });
+    const before = {};
+    Object.keys(prev || {}).forEach((l) => { if (prev[l]?.[key] !== undefined) before[l] = prev[l][key]; });
+    if (JSON.stringify(sortKeys(texts)) !== JSON.stringify(sortKeys(before))) ops.push({ type: 'put', key, texts });
+    prevKeys.delete(key);
+  });
+  prevKeys.forEach((key) => ops.push({ type: 'delete', key }));
+  return ops;
+}
+
+// Применяет операции из diffDictionary к словарю (чисто, без изменения исходного).
+// Нужна, чтобы «переложить» локальные правки поверх свежей версии словаря с сервера.
+export function applyOps(dict, ops) {
+  const next = normalizeDictionary(dict);
+  (ops || []).forEach((op) => {
+    if (op.type === 'delete') {
+      Object.keys(next).forEach((l) => { next[l] = { ...next[l] }; delete next[l][op.key]; });
+    } else if (op.type === 'put') {
+      LOCALES.forEach((l) => {
+        next[l] = { ...next[l] };
+        if (op.texts?.[l] !== undefined) next[l][op.key] = op.texts[l]; else delete next[l][op.key];
+      });
+    }
+  });
+  return next;
+}
+
+function sortKeys(obj) {
+  return Object.fromEntries(Object.keys(obj).sort().map((k) => [k, obj[k]]));
+}
+
 // ── Хранение в localStorage (каждый вызов в try/catch: в приватном режиме может бросать) ──
 const STORAGE_KEY = 'jgb.sharedDictionary';
 
