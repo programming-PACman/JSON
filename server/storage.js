@@ -62,7 +62,7 @@ export async function createStorage(dataDir) {
       return specLock(async () => {
         const current = await readJson(specFile(id), null);
         if (!current) return null;
-        const record = { ...current, updatedAt: current, spec };
+        const record = { ...current, updatedAt: new Date().toISOString(), spec };
         await writeJsonAtomic(specFile(id), record);
         return record;
       });
