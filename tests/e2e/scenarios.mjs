@@ -31,7 +31,31 @@ const newPage = async (browser, url) => {
 };
 
 // Сценарии, где сетевые ошибки в консоли браузера ожидаемы (сервер «упал» или отклонил запрос)
-export const expectNetworkErrors = new Set(['Сервер: офлайн-режим и повторная отправка', 'Сервер: некорректную спецификацию отклоняет', 'Сервер недоступен: сохранение формы сообщает об ошибке']);
+// Сценарии с включённой авторизацией на сервере (остальные идут в режиме без неё)
+export const authScenarios = new Set(['Вход: регистрация, сессия, выход', 'Вход: неверный пароль', 'Вход: аноним не может сохранять, после входа правки уходят', 'Вход: чужую форму изменить нельзя', 'Админ: создаёт пользователей, видит и открывает формы', 'Админ: принудительное удаление пользователя']);
+
+export const expectNetworkErrors = new Set(['Админ: принудительное удаление пользователя', 'Админ: создаёт пользователей, видит и открывает формы', 'Вход: неверный пароль', 'Вход: аноним не может сохранять, после входа правки уходят', 'Вход: чужую форму изменить нельзя', 'Сервер: офлайн-режим и повторная отправка', 'Сервер: некорректную спецификацию отклоняет', 'Сервер недоступен: сохранение формы сообщает об ошибке']);
+
+const createUser = async (page, name, pass, role) => {
+  await page.getByRole('button', { name: 'Пользователи' }).click();
+  await page.locator('.users-add input[type=text]').fill(name);
+  await page.locator('.users-add input[type=password]').fill(pass);
+  if (role) await page.locator('.users-add select').selectOption(role);
+  await page.getByRole('button', { name: 'Создать пользователя' }).click();
+  await page.locator('.users-panel .server-ok').waitFor();
+};
+const authForm = (page) => page.locator('.auth-panel');
+const signUp = async (page, name, pass) => {
+  await authForm(page).locator('input[type=text]').fill(name);
+  await authForm(page).locator('input[type=password]').fill(pass);
+  await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
+  await page.locator('[data-auth=in]').waitFor();
+};
+const logIn = async (page, name, pass) => {
+  await authForm(page).locator('input[type=text]').fill(name);
+  await authForm(page).locator('input[type=password]').fill(pass);
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+};
 
 export default {
   async 'JSON → форма'({ page, specText, check }) {
@@ -386,7 +410,7 @@ export default {
     check('сервер вернул id из 12 hex-символов', Boolean(id));
     check('кнопка теперь «Обновить на сервере»', await page.getByRole('button', { name: 'Обновить на сервере' }).count() === 1);
     const b = await newPage(browser, url);
-    await b.page.locator('.server-tools select').selectOption(id);
+    await b.page.locator(`tr[data-spec-id="${id}"]`).getByRole('button', { name: 'Открыть' }).click();
     await b.page.locator('.form-renderer').waitFor();
     check('другой пользователь открыл форму по списку', await b.page.getByText('Имя пользователя').count() > 0);
     await b.context.close();
@@ -417,5 +441,147 @@ export default {
     check('после добавления поля введённое значение осталось', (await page.locator('.form-renderer input[type=text]').first().inputValue()) === 'Иван');
     await editorField(page, 'Описание (description)').locator('input').fill('подсказка');
     check('и после правки свойства тоже', (await page.locator('.form-renderer input[type=text]').first().inputValue()) === 'Иван');
+  },
+  async 'Вход: регистрация, сессия, выход'({ page, check }) {
+    check('до входа показана форма входа', await page.locator('[data-auth=out]').count() === 1);
+    await signUp(page, 'alice', 'password1');
+    check('первый пользователь — admin', (await page.locator('.auth-name').innerText()).includes('alice (admin)'));
+    check('пароль очищен из поля', await page.locator('[data-auth=in] input').count() === 0);
+    await page.reload();
+    await page.locator('[data-auth=in]').waitFor();
+    check('после перезагрузки сессия сохранилась (cookie)', (await page.locator('.auth-name').innerText()).includes('alice'));
+    const cookies = await page.context().cookies();
+    check('cookie сессии HttpOnly', cookies.find((c) => c.name === 'sid')?.httpOnly === true);
+    check('скрипт страницы не видит cookie сессии', !(await page.evaluate(() => document.cookie)).includes('sid'));
+    await page.getByRole('button', { name: 'Выйти' }).click();
+    await page.locator('[data-auth=out]').waitFor();
+    await page.reload();
+    check('после выхода и перезагрузки — снова форма входа', await page.locator('[data-auth=out]').count() === 1);
+    await logIn(page, 'ALICE', 'password1');
+    await page.locator('[data-auth=in]').waitFor();
+    check('вход по логину без учёта регистра', true);
+    await page.getByRole('button', { name: 'Выйти' }).click();
+    await page.locator('[data-auth=out]').waitFor();
+    check('после первого пользователя кнопки «Зарегистрироваться» нет', await page.getByRole('button', { name: 'Зарегистрироваться' }).count() === 0);
+  },
+
+  async 'Вход: неверный пароль'({ page, check }) {
+    await signUp(page, 'bob', 'password1');
+    await page.getByRole('button', { name: 'Выйти' }).click();
+    await logIn(page, 'bob', 'wrong-password');
+    await page.locator('.auth-error').waitFor();
+    check('сообщение «Неверный логин или пароль»', (await page.locator('.auth-error').innerText()) === 'Неверный логин или пароль');
+    await page.locator('.auth-panel input[type=text]').fill('x');
+    await page.locator('.auth-panel input[type=password]').fill('');
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
+    check('пустой пароль — подсказка без запроса', (await page.locator('.auth-error').innerText()) === 'Введите логин и пароль');
+    await page.getByRole('button', { name: 'EN' }).click();
+    check('на EN сообщения и кнопки по-английски', await page.getByRole('button', { name: 'Log in' }).count() === 1);
+  },
+
+  async 'Вход: аноним не может сохранять, после входа правки уходят'({ page, specText, check }) {
+    // сервер уже знает одного пользователя, чтобы «аноним» был именно анонимом
+    await loadSpec(page, specText);
+    check('кнопка «Сохранить на сервер» заблокирована, есть подсказка', await page.getByRole('button', { name: 'Сохранить на сервер' }).isDisabled() && await page.locator('.server-hint').count() === 1);
+    await openDict(page);
+    await addEntry(page, 'anon_key', 'Аноним', 'Anon');
+    await page.waitForFunction(() => document.querySelector('[data-sync]')?.dataset.sync === 'auth', null, { timeout: 8000 });
+    check('статус «войдите, чтобы сохранять»', (await page.locator('.dictionary-sync').innerText()).includes('Войдите'));
+    check('запись осталась локально', await page.locator('.dictionary-table code', { hasText: 'anon_key' }).count() === 1);
+    check('на сервере её нет', (await serverDict(page)).ru.anon_key === undefined);
+    await signUp(page, 'carol', 'password1');
+    await synced(page);
+    check('после входа накопленная правка ушла на сервер', (await serverDict(page)).en.anon_key === 'Anon');
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    check('кнопка сохранения формы разблокирована', await page.getByRole('button', { name: 'Сохранить на сервер' }).isEnabled());
+  },
+
+  async 'Вход: чужую форму изменить нельзя'({ page, url, browser, specText, check }) {
+    await signUp(page, 'owner', 'password1');
+    await loadSpec(page, specText);
+    await page.getByRole('button', { name: 'Сохранить на сервер' }).click();
+    const id = ((await page.locator('.server-ok').innerText()).match(/[a-f0-9]{12}/) || [])[0];
+    await createUser(page, 'guest', 'password1');
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    const b = await newPage(browser, url);
+    await logIn(b.page, 'guest', 'password1');
+    await b.page.locator('[data-auth=in]').waitFor();
+    await b.page.locator(`tr[data-spec-id="${id}"]`).getByRole('button', { name: 'Открыть' }).click();
+    await b.page.locator('.form-renderer').waitFor();
+    await b.page.getByRole('button', { name: 'Обновить на сервере' }).click();
+    await b.page.locator('.server-error').waitFor();
+    check('не владелец получает отказ', (await b.page.locator('.server-error').innerText()).includes('только её владелец'));
+    await b.page.getByRole('button', { name: 'Сохранить как новую' }).click();
+    await b.page.locator('.server-ok').waitFor();
+    check('но «Сохранить как новую» работает (своя копия)', true);
+    await b.context.close();
+  },
+  async 'Админ: создаёт пользователей, видит и открывает формы'({ page, url, browser, specText, check }) {
+    await signUp(page, 'boss', 'password1');
+    await loadSpec(page, specText);
+    await page.getByRole('button', { name: 'Сохранить на сервер' }).click();
+    await page.locator('.server-ok').waitFor();
+    // после перезагрузки (новая сессия страницы) админ видит форму в списке и открывает её
+    await page.reload();
+    await page.locator('[data-auth=in]').waitFor();
+    const row = page.locator('.server-list tbody tr').first();
+    await row.waitFor();
+    check('в списке форм виден владелец (boss)', (await row.innerText()).includes('boss'));
+    await row.getByRole('button', { name: 'Открыть' }).click();
+    await page.locator('.form-renderer').waitFor();
+    check('админ загрузил форму с сервера', await page.getByText('Имя пользователя').count() > 0);
+    // создание пользователей
+    check('у админа есть вкладка «Пользователи»', await page.getByRole('button', { name: 'Пользователи' }).count() === 1);
+    await createUser(page, 'worker', 'password2');
+    check('новый пользователь появился в списке с ролью editor', (await page.locator('.users-table').innerText()).includes('worker') && (await page.locator('.users-table').innerText()).includes('editor'));
+    check('админ остался собой (сессия не переключилась)', (await page.locator('.auth-name').innerText()).includes('boss'));
+    await page.locator('.users-add input[type=text]').fill('worker');
+    await page.locator('.users-add input[type=password]').fill('password2');
+    await page.getByRole('button', { name: 'Создать пользователя' }).click();
+    await page.locator('.users-panel .server-error').waitFor();
+    check('дубликат логина отклонён с сообщением', (await page.locator('.users-panel .server-error').innerText()).includes('занят'));
+    await page.locator('.users-add input[type=text]').fill('short');
+    await page.locator('.users-add input[type=password]').fill('123');
+    await page.getByRole('button', { name: 'Создать пользователя' }).click();
+    await page.locator('.users-panel .server-error', { hasText: 'Пароль' }).waitFor();
+    check('слабый пароль отклонён', true);
+    // обычный пользователь
+    const w = await newPage(browser, url);
+    check('аноним: кнопки «Зарегистрироваться» нет (регистрация закрыта)', await w.page.getByRole('button', { name: 'Зарегистрироваться' }).count() === 0);
+    await logIn(w.page, 'worker', 'password2');
+    await w.page.locator('[data-auth=in]').waitFor();
+    check('editor не видит вкладку «Пользователи»', await w.page.getByRole('button', { name: 'Пользователи' }).count() === 0);
+    check('editor видит список форм и может открыть', await w.page.locator('.server-list tbody tr').count() === 1);
+    await w.page.locator('.server-list tbody tr').first().getByRole('button', { name: 'Открыть' }).click();
+    await w.page.locator('.form-renderer').waitFor();
+    check('editor загрузил форму', await w.page.getByText('Имя пользователя').count() > 0);
+    await w.context.close();
+  },
+  async 'Админ: принудительное удаление пользователя'({ page, url, browser, check }) {
+    await signUp(page, 'chief', 'password1');
+    await createUser(page, 'temp_user', 'password2');
+    await createUser(page, 'stays', 'password3');
+    const w = await newPage(browser, url);
+    await logIn(w.page, 'temp_user', 'password2');
+    await w.page.locator('[data-auth=in]').waitFor();
+    const me = page.locator('.users-table tr', { hasText: 'chief' });
+    check('напротив самого себя кнопки удаления нет («это вы»)', await me.getByRole('button').count() === 0 && (await me.innerText()).includes('это вы'));
+    await page.getByRole('button', { name: 'Удалить temp_user' }).click();
+    check('удаление требует подтверждения (пользователь ещё в списке)', (await page.locator('.users-table').innerText()).includes('temp_user') && await page.getByRole('button', { name: 'Да, удалить' }).count() === 1);
+    await page.getByRole('button', { name: 'Отмена' }).click();
+    check('«Отмена» ничего не удаляет', (await page.locator('.users-table').innerText()).includes('temp_user'));
+    await page.getByRole('button', { name: 'Удалить temp_user' }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await page.locator('.users-panel .server-ok', { hasText: 'удалён' }).waitFor();
+    const table = await page.locator('.users-table').innerText();
+    check('удалённого нет в списке, остальные на месте', !table.includes('temp_user') && table.includes('stays') && table.includes('chief'));
+    // его открытая сессия умерла: следующее изменение даёт «нужно войти»
+    await w.page.reload();
+    await w.page.locator('[data-auth=out]').waitFor();
+    check('удалённый пользователь вышел из системы', true);
+    await logIn(w.page, 'temp_user', 'password2');
+    await w.page.locator('.auth-error').waitFor();
+    check('войти под удалённым логином нельзя', (await w.page.locator('.auth-error').innerText()) === 'Неверный логин или пароль');
+    await w.context.close();
   },
 };

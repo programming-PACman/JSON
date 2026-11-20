@@ -6,11 +6,11 @@ const DEBOUNCE_MS = 500; // правки в таблице копятся и у�
 const RETRY_MS = 5000;   // повтор при недоступном сервере
 
 // Общий словарь: хранится на сервере, локальная копия в localStorage — запасной вариант (офлайн).
-// Состояния status.state: connecting | synced | saving | offline | error.
+// Состояния status.state: connecting | synced | saving | offline | auth (нужен вход) | error.
 // Принцип: на сервер уходят не «весь словарь целиком», а операции над отдельными ключами
 // (diffDictionary), а ответ сервера накладывается обратно с сохранением ещё не отправленных
 // правок (applyOps) — поэтому чужие изменения не затираются и свои не теряются.
-export function useSharedDictionary() {
+export function useSharedDictionary(user, onUnauthorized) {
   const [dictionary, setDictionaryState] = useState(() => loadDictionary());
   const [status, setStatus] = useState({ state: 'connecting' });
   const initial = useRef(dictionary);  // что было в localStorage при запуске
@@ -24,6 +24,7 @@ export function useSharedDictionary() {
   const schedule = (ms) => { clearTimeout(timer.current); timer.current = setTimeout(() => fns.current.flush(), ms); };
 
   const fail = (e) => {
+    if (e instanceof ApiError && e.status === 401) { setStatus({ state: 'auth' }); onUnauthorized?.(); return; } // правки остаются локально до входа
     if (e instanceof ApiError && e.status === 0) { setStatus({ state: 'offline' }); schedule(RETRY_MS); }
     else setStatus({ state: 'error', message: e?.message || String(e) });
   };
@@ -84,6 +85,9 @@ export function useSharedDictionary() {
     return () => { clearTimeout(timer.current); window.removeEventListener('focus', onFocus); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // после входа отправляем накопленные правки
+  useEffect(() => { if (user) fns.current.flush(); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setDictionary = useCallback((next) => {
     commit(next);

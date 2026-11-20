@@ -1,6 +1,6 @@
 // Хранилище на файлах (JSON). Без внешних зависимостей, запись атомарная
 // (сначала во временный файл, потом rename) — обрыв посреди записи не портит данные.
-import { mkdir, readFile, writeFile, rename, readdir, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, readdir, unlink, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 
@@ -16,9 +16,9 @@ async function readJson(file, fallback) {
   }
 }
 
-async function writeJsonAtomic(file, data) {
+async function writeJsonAtomic(file, data, mode = 0o644) {
   const tmp = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
-  await writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
+  await writeFile(tmp, JSON.stringify(data, null, 2), { encoding: 'utf8', mode });
   await rename(tmp, file);
 }
 
@@ -38,17 +38,21 @@ export async function createStorage(dataDir) {
   const dictFile = path.join(dataDir, 'dictionary.json');
   await mkdir(specsDir, { recursive: true });
   const dictLock = makeLock();
+  const usersFile = path.join(dataDir, 'users.json');
+  const sessionsFile = path.join(dataDir, 'sessions.json');
+  const usersLock = makeLock();
+  const sessionsLock = makeLock();
   const specLock = makeLock();
 
   const specFile = (id) => path.join(specsDir, `${id}.json`);
 
   return {
     // ---- спецификации ----
-    async saveSpec(spec) {
+    async saveSpec(spec, ownerId = null) {
       return specLock(async () => {
         const id = newId();
         const now = new Date().toISOString();
-        const record = { id, createdAt: now, updatedAt: now, spec };
+        const record = { id, ownerId, createdAt: now, updatedAt: now, spec };
         await writeJsonAtomic(specFile(id), record);
         return record;
       });
@@ -73,13 +77,50 @@ export async function createStorage(dataDir) {
         try { await unlink(specFile(id)); return true; } catch (e) { if (e.code === 'ENOENT') return false; throw e; }
       });
     },
+    // Список не должен ломаться из-за одного плохого файла (битый JSON, запись старого формата,
+    // посторонний файл в папке): такие файлы пропускаются/достраиваются, а в лог пишется предупреждение.
     async listSpecs() {
       const files = (await readdir(specsDir)).filter((f) => f.endsWith('.json'));
-      const records = await Promise.all(files.map((f) => readJson(path.join(specsDir, f), null)));
-      return records
-        .filter(Boolean)
-        .map((r) => ({ id: r.id, title: r.spec?.title ?? '', createdAt: r.createdAt, updatedAt: r.updatedAt }))
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const items = await Promise.all(files.map(async (f) => {
+        const id = f.slice(0, -5);
+        const file = path.join(specsDir, f);
+        try {
+          const r = await readJson(file, null);
+          if (!ID_RE.test(id) || !r || typeof r !== 'object' || !r.spec || typeof r.spec !== 'object') {
+            console.warn(`[storage] пропущен файл, не похожий на спецификацию: ${f}`);
+            return null;
+          }
+          const mtime = (await stat(file)).mtime.toISOString();
+          return {
+            id, ownerId: r.ownerId ?? null, title: typeof r.spec.title === 'string' ? r.spec.title : '',
+            createdAt: typeof r.createdAt === 'string' ? r.createdAt : mtime,
+            updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : (typeof r.createdAt === 'string' ? r.createdAt : mtime),
+          };
+        } catch (e) {
+          console.warn(`[storage] не удалось прочитать ${f}: ${e.message}`);
+          return null;
+        }
+      }));
+      return items.filter(Boolean).sort((x, y) => y.updatedAt.localeCompare(x.updatedAt));
+    },
+
+    // ---- пользователи и сессии (файлы доступны только владельцу процесса: режим 0600) ----
+    async getUsers() { return readJson(usersFile, []); },
+    // update(текущий список) -> новый список; вся операция атомарна (проверка уникальности логина без гонок)
+    async updateUsers(update) {
+      return usersLock(async () => {
+        const next = update(await readJson(usersFile, []));
+        await writeJsonAtomic(usersFile, next, 0o600);
+        return next;
+      });
+    },
+    async getSessions() { return readJson(sessionsFile, {}); },
+    async updateSessions(update) {
+      return sessionsLock(async () => {
+        const next = update(await readJson(sessionsFile, {}));
+        await writeJsonAtomic(sessionsFile, next, 0o600);
+        return next;
+      });
     },
 
     // ---- общий словарь: читаем/меняем только под блокировкой ----

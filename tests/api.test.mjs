@@ -1,13 +1,13 @@
-// Тесты REST API: поднимаем настоящий http-сервер на свободном порту, временная папка данных.
+// Тесты REST API (режим без авторизации; авторизация — в auth.test.mjs): поднимаем настоящий http-сервер на свободном порту, временная папка данных.
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { mkdtemp, rm, readdir } from 'node:fs/promises';
+import { mkdtemp, rm, readdir, writeFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { createApp } from '../server/app.js';
 
 const dataDir = await mkdtemp(path.join(os.tmpdir(), 'jgb-api-'));
-const server = http.createServer(await createApp({ dataDir }));
+const server = http.createServer(await createApp({ dataDir, requireAuth: false }));
 await new Promise((r) => server.listen(0, r));
 const base = `http://127.0.0.1:${server.address().port}`;
 
@@ -62,6 +62,19 @@ try {
     assert.equal((await call('DELETE', `/api/spec/${id}`)).status, 204);
     assert.equal((await call('DELETE', `/api/spec/${id}`)).status, 404);
     assert.equal((await call('GET', '/api/specs')).json.length, 0);
+  });
+  await test('список форм не ломается из-за плохих файлов в папке данных', async () => {
+    const dir = path.join(dataDir, 'specs');
+    await writeFile(path.join(dir, 'aaaaaaaaaaaa.json'), '{ битый json');                                 // повреждён
+    await writeFile(path.join(dir, 'bbbbbbbbbbbb.json'), JSON.stringify({ id: 'bbbbbbbbbbbb', spec: { title: 'Без дат', elements: [] } })); // старый формат: нет дат
+    await writeFile(path.join(dir, 'cccccccccccc.json'), '[1,2,3]');                                      // не запись
+    await writeFile(path.join(dir, 'notes.json'), '{}');                                                  // посторонний файл
+    await writeFile(path.join(dir, 'dddddddddddd.json'), 'null');
+    const r = await call('GET', '/api/specs');
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json.map((x) => x.id), ['bbbbbbbbbbbb']);
+    assert.equal(r.json[0].title, 'Без дат'); assert.ok(r.json[0].updatedAt);
+    for (const f of ['aaaaaaaaaaaa', 'bbbbbbbbbbbb', 'cccccccccccc', 'dddddddddddd', 'notes']) await rm(path.join(dir, `${f}.json`));
   });
   await test('словарь: PUT/GET/удаление перевода/DELETE', async () => {
     assert.deepEqual((await call('GET', '/api/dictionary')).json, { ru: {}, en: {} });

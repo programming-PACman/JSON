@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from './core/api.js';
+import AuthPanel from './builder/AuthPanel.jsx';
+import UsersPanel from './builder/UsersPanel.jsx';
 import FormRenderer from './components/FormRenderer.jsx';
 import { validateSpec } from './core/validateSpec.js';
 import {
@@ -42,8 +45,15 @@ export default function App() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [collected, setCollected] = useState(null);
   const [checkedOk, setCheckedOk] = useState(false);
-  const [mode, setMode] = useState('json'); // 'json' | 'builder' | 'preview' | 'dictionary'
-  const { dictionary, setDictionary, status: dictStatus, refresh: refreshDictionary } = useSharedDictionary();
+  const [mode, setMode] = useState('json'); // 'json' | 'builder' | 'preview' | 'dictionary' | 'users'
+  const [user, setUser] = useState(null);
+  const [registrationOpen, setRegistrationOpen] = useState(false); // true, пока в системе нет ни одного пользователя
+  const [requireAuth, setRequireAuth] = useState(false); // пока не знаем (или сервера нет) — не блокируем интерфейс
+  const { dictionary, setDictionary, status: dictStatus, refresh: refreshDictionary } = useSharedDictionary(user, () => setUser(null));
+
+  useEffect(() => {
+    api.me().then((r) => { setUser(r.user); setRequireAuth(Boolean(r.requireAuth)); setRegistrationOpen(Boolean(r.registrationOpen)); }).catch(() => {});
+  }, []);
   const [builderSpec, setBuilderSpec] = useState({ title: 'Новая форма', elements: [] });
 
   const t = UI_STRINGS[locale];
@@ -183,6 +193,7 @@ export default function App() {
     <div className="app">
       <div className="app-header">
         <h1>{t.appTitle}</h1>
+        <AuthPanel user={user} locale={locale} onUser={(u) => { setUser(u); if (u) setRegistrationOpen(false); }} registrationOpen={registrationOpen} />
         <button type="button" className="lang-switch" onClick={() => setLocale(locale === 'ru' ? 'en' : 'ru')}>
           {locale === 'ru' ? 'EN' : 'RU'}
         </button>
@@ -195,22 +206,24 @@ export default function App() {
             <button type="button" className={mode === 'builder' ? 'active' : 'secondary'} onClick={switchToBuilder}>{t.builderTab}</button>
             <button type="button" className={mode === 'preview' ? 'active' : 'secondary'} onClick={() => setMode('preview')}>{t.previewTab}</button>
             <button type="button" className={mode === 'dictionary' ? 'active' : 'secondary'} onClick={() => setMode('dictionary')}>{t.dictTab}</button>
+            {user?.role === 'admin' && <button type="button" className={mode === 'users' ? 'active' : 'secondary'} onClick={() => setMode('users')}>{t.usersTab}</button>}
           </div>
 
           {mode === 'json' && (
             <>
               <SpecInputPanel text={text} onTextChange={setText} onLoad={handleLoad} onCheck={handleCheck} onFile={handleFile} locale={locale} />
               <JsonTools getText={() => text} onImport={handleImport} locale={locale} filename={spec?.title} showImport={false} />
-              <ServerTools getText={() => text} onImport={handleImport} locale={locale} />
+              <ServerTools getText={() => text} onImport={handleImport} locale={locale} canSave={!requireAuth || Boolean(user)} reloadKey={user?.id ?? 'anon'} />
             </>
           )}
           {mode === 'builder' && (
             <>
               <JsonTools getText={() => JSON.stringify(builderSpec, null, 2)} onImport={handleImport} locale={locale} filename={builderSpec.title} />
-              <ServerTools getText={() => JSON.stringify(builderSpec, null, 2)} onImport={handleImport} locale={locale} />
+              <ServerTools getText={() => JSON.stringify(builderSpec, null, 2)} onImport={handleImport} locale={locale} canSave={!requireAuth || Boolean(user)} reloadKey={user?.id ?? 'anon'} />
               <BuilderPanel spec={builderSpec} errors={specErrors} onChange={handleBuilderChange} dictionaryKeys={allKeys(dictionary)} />
             </>
           )}
+          {mode === 'users' && user?.role === 'admin' && <UsersPanel locale={locale} currentUserId={user.id} />}
           {mode === 'dictionary' && (
             <DictionaryPanel dictionary={dictionary} spec={spec} locale={locale} onChange={setDictionary} status={dictStatus} onRefresh={refreshDictionary} />
           )}

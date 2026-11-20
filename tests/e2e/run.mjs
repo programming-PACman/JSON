@@ -45,7 +45,7 @@ const scenarios = scenarioModule.default;
 
 for (const [title, fn] of Object.entries(scenarios)) {
   const dataDir = mkdtempSync(path.join(os.tmpdir(), 'jgb-e2e-data-'));
-  apiState.handler = await createApp({ dataDir });
+  apiState.handler = await createApp({ dataDir, requireAuth: scenarioModule.authScenarios.has(title) });
   apiState.offline = false;
   const context = await browser.newContext();
   const page = await context.newPage();

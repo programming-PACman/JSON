@@ -29,6 +29,13 @@ async function request(method, url, body) {
 }
 
 export const api = {
+  me: () => request('GET', '/api/auth/me'),
+  login: (username, password) => request('POST', '/api/auth/login', { username, password }),
+  register: (username, password) => request('POST', '/api/auth/register', { username, password }),
+  createUser: (username, password, role) => request('POST', '/api/auth/register', { username, password, role }),
+  listUsers: () => request('GET', '/api/users'),
+  deleteUser: (id) => request('DELETE', `/api/users/${id}`),
+  logout: () => request('POST', '/api/auth/logout'),
   getDictionary: () => request('GET', '/api/dictionary'),
   putEntry: (key, texts) => request('PUT', `/api/dictionary/entries/${encodeURIComponent(key)}`, texts),
   deleteEntry: (key) => request('DELETE', `/api/dictionary/entries/${encodeURIComponent(key)}`),

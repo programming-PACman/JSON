@@ -45,6 +45,7 @@ export default function DictionaryPanel({ dictionary, spec, locale, onChange, st
     synced: t.dictSyncSynced,
     saving: t.dictSyncSaving,
     offline: t.dictSyncOffline,
+    auth: t.dictSyncAuth,
     error: t.dictSyncError(status.message),
   }[status.state];
 

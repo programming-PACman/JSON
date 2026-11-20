@@ -96,3 +96,16 @@ tr.dragging td { background: #f0f0f0; }
 .server-tools-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .server-ok { color: #1b7a3a; font-size: 14px; margin: 6px 0 0; }
 .server-error { color: #b3261e; font-size: 14px; margin: 6px 0 0; }
+
+/* ── вход ── */
+.auth-panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: auto; margin-right: 12px; }
+.auth-panel input { width: 130px; }
+.auth-name { font-weight: 600; }
+.auth-error { color: #b3261e; font-size: 14px; }
+.server-hint { color: #8a6d00; font-size: 14px; margin: 6px 0 0; }
+.users-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.server-list { max-height: 260px; overflow: auto; }
+.server-list-title { font-size: 15px; margin: 12px 0 4px; }
+.server-empty { color: #666; font-size: 14px; margin: 4px 0; }
+.users-confirm { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+button.danger { background: #b3261e; color: #fff; border-color: #b3261e; }
